@@ -236,3 +236,20 @@ def _check_files(skill_dir: Path, rel: str) -> list[Finding]:
 
 def _rel(skill_dir: Path, path: Path, rel: str) -> str:
     return f"{rel}/{path.relative_to(skill_dir).as_posix()}"
+
+
+def _plural(count: int, word: str) -> str:
+    return f"{count} {word}{'' if count == 1 else 's'}"
+
+
+def format_report(result: QaResult) -> str:
+    lines = []
+    for f in sorted(result.findings, key=lambda f: (f.path, f.line or 0, f.check_id)):
+        label = "ERROR" if f.level == ERROR else "WARN"
+        location = f"{f.path}:{f.line}" if f.line else f.path
+        lines.append(f"{label} {f.check_id} {location}: {f.message}")
+    lines.append(
+        f"QA: {_plural(len(result.errors), 'error')}, {_plural(len(result.warnings), 'warning')}"
+        f" across {_plural(result.skill_count, 'skill')}"
+    )
+    return "\n".join(lines)
