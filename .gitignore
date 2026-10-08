@@ -1,0 +1,16 @@
+/.claude/
+/CLAUDE.md
+/docs/
+/.mcp.json
+/solo.yml
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
