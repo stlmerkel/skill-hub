@@ -5,6 +5,7 @@ from skill_hub.cli import main
 from tests.conftest import GOOD_HUB, make_skill, skill_md, write_hub
 
 SECRET = "AKIA" + "Q" * 16
+LOWER = "sk" + "-" + "a1" * 12  # lowercase, so it is a valid skill name
 
 
 def test_clean_exit_zero(tmp_path, capsys):
@@ -46,6 +47,7 @@ def test_missing_everything_is_findings_not_traceback(tmp_path, capsys):
 def test_secret_never_printed(tmp_path):
     write_hub(tmp_path)
     make_skill(tmp_path, "as-name", skill_md(SECRET))  # secret as the name value
+    make_skill(tmp_path, "as-mismatched-name", skill_md(LOWER))  # valid name, differs from directory
     make_skill(tmp_path, "as-key", skill_md("as-key", extra_frontmatter=f"{SECRET}: x\n"))
     make_skill(tmp_path, "in-bad-yaml", f"---\nname: [{SECRET}\n---\nbody\n")
     make_skill(tmp_path, "in-body", skill_md("in-body", body=f"\nkey {SECRET}\n"))
@@ -56,6 +58,7 @@ def test_secret_never_printed(tmp_path):
     )
     assert proc.returncode == 1
     assert SECRET not in proc.stdout and SECRET not in proc.stderr
+    assert LOWER not in proc.stdout and LOWER not in proc.stderr
     assert "S4" in proc.stdout and "S6" in proc.stdout and "S3" in proc.stdout and "S10" in proc.stdout
 
 
