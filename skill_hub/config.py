@@ -33,7 +33,7 @@ def check_hub(root: Path) -> tuple[list[Finding], HubConfig | None]:
         return [_error("H1", "hub.yml is not a regular file")], None
 
     try:
-        text = path.read_bytes().decode("utf-8").removeprefix("﻿")
+        text = path.read_bytes().decode("utf-8").removeprefix("\ufeff")
     except OSError:
         return [_error("H2", "hub.yml could not be read")], None
     except UnicodeDecodeError:
