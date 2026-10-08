@@ -1,6 +1,7 @@
 # tests/test_qa_skill.py
 import os
 import sys
+import warnings
 
 import pytest
 
@@ -229,13 +230,14 @@ def test_s13_unreadable_subdirectory_fails_closed(tmp_path):
         locked.chmod(0o755)
 
 
-def test_s9_compile_warning_does_not_echo_source(tmp_path, capfd):
+def test_s9_compile_warning_does_not_echo_source(tmp_path):
     skill = make_skill(tmp_path)
     (skill / "scripts").mkdir()
     (skill / "scripts" / "esc.py").write_text('x = "\\d MARKERTEXT"\n', encoding="utf-8")
-    assert check_skill(skill, ()) == []
-    captured = capfd.readouterr()
-    assert "MARKERTEXT" not in captured.out + captured.err
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        assert check_skill(skill, ()) == []
+    assert caught == []
 
 
 @pytest.mark.parametrize("source", ["x = " + "-" * 200000 + "1\n", "(" * 100000 + ")" * 100000 + "\n"])
