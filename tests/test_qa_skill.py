@@ -148,7 +148,8 @@ def test_s8_compatibility(tmp_path, value, expected):
 
 @pytest.mark.parametrize("extra", ["license: 2\n", "allowed-tools: [Read]\n"])
 def test_s8_string_fields(tmp_path, extra):
-    assert ids(run(tmp_path, skill_md(extra_frontmatter=extra))) == ["S8"]
+    findings = run(tmp_path, skill_md(extra_frontmatter=extra))
+    assert ids(findings) == ["S8"] and "quote" in findings[0].message
 
 
 def test_s9_python_must_compile(tmp_path):
@@ -204,10 +205,18 @@ def test_s13_unreadable_file(tmp_path):
         locked.chmod(0o644)
 
 
-def test_hidden_files_ignored(tmp_path):
+def test_hidden_files_and_dirs_inside_a_skill_are_scanned(tmp_path):
     skill = make_skill(tmp_path)
     (skill / ".env").write_text(f"API_KEY={LIVE}xyz12\n", encoding="utf-8")
-    assert check_skill(skill, ()) == []
+    (skill / ".secrets").mkdir()
+    (skill / ".secrets" / "x.txt").write_text(f"password = '{LIVE}'\n", encoding="utf-8")
+    findings = check_skill(skill, ())
+    assert ids(findings) == ["S10", "S10"]
+    assert sorted(f.path for f in findings) == [
+        "src/changelog-formatter/.env",
+        "src/changelog-formatter/.secrets/x.txt",
+    ]
+    assert all(LIVE not in f.message for f in findings)
 
 
 def test_bom_crlf_skill_passes(tmp_path):
@@ -256,3 +265,28 @@ def test_s12_symlinked_directory(tmp_path):
     skill = make_skill(tmp_path)
     (skill / "linkdir").symlink_to(outside, target_is_directory=True)
     assert ids(check_skill(skill, ())) == ["S12"]
+
+
+@pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="permissions not enforced")
+@pytest.mark.parametrize("mode", [0o000, 0o644])
+def test_s13_unreadable_skill_directory_is_one_finding(tmp_path, mode):
+    skill = make_skill(tmp_path)
+    (skill / "notes.md").write_text("x", encoding="utf-8")
+    skill.chmod(mode)
+    try:
+        findings = check_skill(skill, ())
+    finally:
+        skill.chmod(0o755)
+    assert [(f.level, f.check_id, f.path, f.message) for f in findings] == [
+        ("error", "S13", "src/changelog-formatter", "directory could not be read")
+    ]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="mkfifo unavailable on Windows")
+def test_non_regular_file_is_skipped_with_warning(tmp_path):
+    skill = make_skill(tmp_path)
+    os.mkfifo(skill / "pipe")
+    findings = check_skill(skill, ())
+    assert [(f.level, f.check_id, f.path, f.message) for f in findings] == [
+        ("warning", "S12", "src/changelog-formatter/pipe", "not a regular file; not scanned")
+    ]

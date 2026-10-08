@@ -2,6 +2,7 @@
 """Skill checks (S1-S13), run checks (R1-R4), and the QA runner."""
 
 import os
+import stat
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
@@ -59,9 +60,15 @@ def run_qa(root: Path) -> QaResult:
         if entry.name.startswith("."):
             continue
         rel = f"{SRC_DIR}/{entry.name}"
-        if entry.is_symlink():
+        try:
+            is_symlink = entry.is_symlink()
+            is_dir = not is_symlink and entry.is_dir()
+        except OSError:
+            findings.append(Finding(ERROR, "S13", rel, "entry could not be read"))
+            continue
+        if is_symlink:
             findings.append(Finding(WARNING, "R4", rel, "symlink in src/ is not followed"))
-        elif entry.is_dir():
+        elif is_dir:
             skills.append(entry)
         else:
             findings.append(Finding(WARNING, "R3", rel, "file directly in src/ is not a skill; skills are directories"))
@@ -75,6 +82,12 @@ def run_qa(root: Path) -> QaResult:
 
 def check_skill(skill_dir: Path, allow_keys: tuple[str, ...]) -> list[Finding]:
     rel = f"{SRC_DIR}/{skill_dir.name}"
+    try:
+        (skill_dir / SKILL_FILE).lstat()
+    except FileNotFoundError:
+        pass
+    except OSError:
+        return [Finding(ERROR, "S13", rel, "directory could not be read")]
     return [*_check_skill_md(skill_dir, rel, allow_keys), *_check_files(skill_dir, rel)]
 
 
@@ -183,7 +196,7 @@ def _check_fields(fm: dict, key_lines, dir_name: str, md: str, allow_keys: tuple
             error("S8", f"compatibility must be 1-{COMPATIBILITY_MAX} characters and not blank")
     for key in ("license", "allowed-tools"):
         if key in fm and not isinstance(fm[key], str):
-            error("S8", f"{key} must be a string, found {type_name(fm[key])}")
+            error("S8", f"{key} must be a string, found {type_name(fm[key])}; quote it")
 
     return findings
 
@@ -198,18 +211,27 @@ def _check_files(skill_dir: Path, rel: str) -> list[Finding]:
     for dirpath, dirnames, filenames in os.walk(skill_dir, onerror=on_error):
         base = Path(dirpath)
         for name in sorted(dirnames):
-            if name.startswith(".") or (base / name).is_symlink():
+            try:
+                linked = (base / name).is_symlink()
+            except OSError:
+                linked = False  # os.walk reports the unreadable directory itself via onerror
+            if linked:
                 dirnames.remove(name)
-                if not name.startswith("."):
-                    findings.append(Finding(WARNING, "S12", _rel(skill_dir, base / name, rel), "symlink is not followed or scanned"))
+                findings.append(Finding(WARNING, "S12", _rel(skill_dir, base / name, rel), "symlink is not followed or scanned"))
         dirnames.sort()
         for name in sorted(filenames):
-            if name.startswith("."):
-                continue
             path = base / name
             path_rel = _rel(skill_dir, path, rel)
-            if path.is_symlink():
+            try:
+                mode = path.lstat().st_mode
+            except OSError:
+                findings.append(Finding(ERROR, "S13", path_rel, "file could not be read"))
+                continue
+            if stat.S_ISLNK(mode):
                 findings.append(Finding(WARNING, "S12", path_rel, "symlink is not followed or scanned"))
+                continue
+            if not stat.S_ISREG(mode):
+                findings.append(Finding(WARNING, "S12", path_rel, "not a regular file; not scanned"))
                 continue
             try:
                 raw = path.read_bytes()
@@ -235,7 +257,8 @@ def _check_files(skill_dir: Path, rel: str) -> list[Finding]:
 
 
 def _rel(skill_dir: Path, path: Path, rel: str) -> str:
-    return f"{rel}/{path.relative_to(skill_dir).as_posix()}"
+    inner = path.relative_to(skill_dir).as_posix()
+    return rel if inner == "." else f"{rel}/{inner}"
 
 
 def _plural(count: int, word: str) -> str:

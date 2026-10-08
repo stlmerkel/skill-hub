@@ -69,3 +69,41 @@ def test_r1_unreadable_src(tmp_path):
         assert "R1" in ids(run_qa(tmp_path).findings)
     finally:
         src.chmod(0o755)
+
+
+def test_hidden_directory_in_src_is_not_a_skill(tmp_path):
+    write_hub(tmp_path)
+    make_skill(tmp_path)
+    hidden = tmp_path / "src" / ".cache"
+    hidden.mkdir()
+    (hidden / "SKILL.md").write_text("garbage", encoding="utf-8")
+    result = run_qa(tmp_path)
+    assert result.findings == [] and result.skill_count == 1
+
+
+@pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="permissions not enforced")
+@pytest.mark.parametrize("mode", [0o000, 0o644])
+def test_unreadable_skill_directory_is_s13_not_traceback(tmp_path, mode):
+    write_hub(tmp_path)
+    make_skill(tmp_path, "aaa-good")
+    skill = make_skill(tmp_path, "zzz-locked")
+    skill.chmod(mode)
+    try:
+        result = run_qa(tmp_path)
+    finally:
+        skill.chmod(0o755)
+    assert [(f.check_id, f.path) for f in result.findings] == [("S13", "src/zzz-locked")]
+    assert result.skill_count == 2
+
+
+@pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="permissions not enforced")
+def test_unstatable_src_entries_are_s13(tmp_path):
+    write_hub(tmp_path)
+    make_skill(tmp_path)
+    src = tmp_path / "src"
+    src.chmod(0o644)  # listable, not searchable: entries cannot be stat'ed
+    try:
+        result = run_qa(tmp_path)
+    finally:
+        src.chmod(0o755)
+    assert sorted((f.check_id, f.path) for f in result.findings) == [("R2", "src"), ("S13", "src/changelog-formatter")]
