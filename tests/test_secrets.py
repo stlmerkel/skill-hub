@@ -38,6 +38,14 @@ def test_known_token_shapes(token, kind):
     assert kinds(f"Use this: {token} here") == [kind]
 
 
+@pytest.mark.parametrize(
+    "text",
+    ["key_" + AWS, AWS + "Z", "foo_" + SK],
+)
+def test_prefixed_or_suffixed_tokens_still_reported(text):
+    assert len(kinds(text)) == 1
+
+
 def test_sk_inside_a_word_is_not_a_key():
     assert kinds("See the risk-assessment-framework-for-teams guide.") == []
 
@@ -54,6 +62,9 @@ def test_sk_inside_a_word_is_not_a_key():
         f'apiKey = "{LIVE}"',
         'client_secret: "exampleCompany2026!"',
         'client_secret: "changemeButActuallyLive42"',
+        "password: P@ssw0rd-Is-Long-Enough1",
+        "password: Password123456789!",
+        "token: $abc123abc123abc123",
     ],
 )
 def test_credential_assignments(line):
@@ -84,6 +95,7 @@ def test_credential_assignments(line):
         "api_key: short123",  # unquoted, under 16 chars
         "secret: onlylettersnodigitsatall",  # unquoted, no digit
         'password: "short"',  # quoted, under 8 chars
+        "token: https://docs.example.com/v2/auth-guide",
     ],
 )
 def test_not_credentials(line):
