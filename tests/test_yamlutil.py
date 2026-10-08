@@ -54,3 +54,20 @@ def test_scalars_are_coerced_by_yaml_and_reported_raw_in_key_lines():
 def test_list_key_rejected():
     loaded = load_yaml("? [a, b]\n: c\n")
     assert loaded.error is not None  # list keys are unhashable
+
+
+def test_non_printable_character_is_an_error_not_a_traceback():
+    loaded = load_yaml("a: \x01\n")
+    assert loaded.error is not None
+    assert "\x01" not in loaded.error.message
+
+
+def test_nul_character_is_an_error_not_a_traceback():
+    loaded = load_yaml("a: \x00\n")
+    assert loaded.error is not None
+
+
+def test_deep_nesting_is_an_error_not_a_traceback():
+    loaded = load_yaml("a: " + "[" * 5000)
+    assert loaded.error is not None
+    assert "nested" in loaded.error.message

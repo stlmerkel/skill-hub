@@ -45,8 +45,9 @@ class _StrictLoader(yaml.SafeLoader):
 
 
 def load_yaml(text: str) -> Loaded:
-    loader = _StrictLoader(text)
+    loader = None
     try:
+        loader = _StrictLoader(text)
         node = loader.get_single_node()
         data = loader.construct_document(node) if node is not None else None
     except _Problem as problem:
@@ -54,10 +55,15 @@ def load_yaml(text: str) -> Loaded:
     except yaml.MarkedYAMLError as exc:
         mark = exc.problem_mark or exc.context_mark
         return Loaded(error=YamlError("is not valid YAML", mark.line + 1 if mark else None))
+    except yaml.reader.ReaderError:
+        return Loaded(error=YamlError("contains a non-printable character", None))
+    except RecursionError:
+        return Loaded(error=YamlError("is nested too deeply", None))
     except (yaml.YAMLError, ValueError, TypeError, OverflowError):
         return Loaded(error=YamlError("contains a value YAML cannot construct (for example an invalid date); quote it", None))
     finally:
-        loader.dispose()
+        if loader is not None:
+            loader.dispose()
 
     key_lines: tuple[tuple[str | None, int], ...] = ()
     if isinstance(node, yaml.MappingNode):
