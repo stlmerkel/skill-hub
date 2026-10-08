@@ -17,7 +17,7 @@ class SplitResult:
 
 
 def split_frontmatter(text: str) -> SplitResult:
-    lines = text.removeprefix("﻿").replace("\r\n", "\n").split("\n")
+    lines = text.removeprefix("\ufeff").replace("\r\n", "\n").split("\n")
     if lines[0] != DELIMITER:
         raise FrontmatterError("must start with a '---' line")
     for index in range(1, len(lines)):

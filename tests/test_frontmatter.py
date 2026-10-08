@@ -16,7 +16,7 @@ def test_body_may_contain_delimiter():
 
 
 def test_bom_and_crlf_tolerated():
-    result = split_frontmatter("﻿---\r\nname: a\r\n---\r\nbody\r\n")
+    result = split_frontmatter("\ufeff---\r\nname: a\r\n---\r\nbody\r\n")
     assert result.frontmatter == "name: a"
     assert result.body == "body\n"
 
