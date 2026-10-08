@@ -1,3 +1,4 @@
+import os
 # tests/test_qa_run.py
 import sys
 
@@ -56,3 +57,15 @@ def test_broken_hub_still_checks_skills_with_empty_allow_keys(tmp_path):
         encoding="utf-8",
     )
     assert ids(run_qa(tmp_path).findings) == ["H3", "S6"]
+
+
+@pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="permissions not enforced")
+def test_r1_unreadable_src(tmp_path):
+    write_hub(tmp_path)
+    make_skill(tmp_path)
+    src = tmp_path / "src"
+    src.chmod(0)
+    try:
+        assert "R1" in ids(run_qa(tmp_path).findings)
+    finally:
+        src.chmod(0o755)

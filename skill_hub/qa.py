@@ -2,6 +2,7 @@
 """Skill checks (S1-S13), run checks (R1-R4), and the QA runner."""
 
 import os
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -50,7 +51,11 @@ def run_qa(root: Path) -> QaResult:
         return QaResult([*findings, Finding(ERROR, "R1", SRC_DIR, "src is not a directory")], 0)
 
     skills = []
-    for entry in sorted(src.iterdir()):
+    try:
+        entries = sorted(src.iterdir())
+    except OSError:
+        return QaResult([*findings, Finding(ERROR, "R1", SRC_DIR, "src/ could not be read")], 0)
+    for entry in entries:
         if entry.name.startswith("."):
             continue
         rel = f"{SRC_DIR}/{entry.name}"
@@ -185,7 +190,12 @@ def _check_fields(fm: dict, key_lines, dir_name: str, md: str, allow_keys: tuple
 
 def _check_files(skill_dir: Path, rel: str) -> list[Finding]:
     findings = []
-    for dirpath, dirnames, filenames in os.walk(skill_dir):
+
+    def on_error(err: OSError) -> None:
+        path_rel = _rel(skill_dir, Path(err.filename), rel) if err.filename else rel
+        findings.append(Finding(ERROR, "S13", path_rel, "directory could not be read"))
+
+    for dirpath, dirnames, filenames in os.walk(skill_dir, onerror=on_error):
         base = Path(dirpath)
         for name in sorted(dirnames):
             if name.startswith(".") or (base / name).is_symlink():
@@ -208,8 +218,10 @@ def _check_files(skill_dir: Path, rel: str) -> list[Finding]:
                 continue
             if path.suffix == ".py":
                 try:
-                    compile(raw, str(path), "exec")
-                except (SyntaxError, ValueError) as exc:
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        compile(raw, str(path), "exec")
+                except (SyntaxError, ValueError, MemoryError, RecursionError) as exc:
                     findings.append(Finding(ERROR, "S9", path_rel, "Python file does not compile", getattr(exc, "lineno", None)))
             try:
                 text = raw.decode("utf-8")

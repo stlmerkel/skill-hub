@@ -214,3 +214,43 @@ def test_bom_crlf_skill_passes(tmp_path):
     text = "\ufeff" + skill_md().replace("\n", "\r\n")
     (skill / "SKILL.md").write_bytes(text.encode("utf-8"))
     assert check_skill(skill, ()) == []
+
+
+@pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="permissions not enforced")
+def test_s13_unreadable_subdirectory_fails_closed(tmp_path):
+    skill = make_skill(tmp_path)
+    locked = skill / "references"
+    locked.mkdir()
+    (locked / "notes.md").write_text(f"password = '{LIVE}'\n", encoding="utf-8")
+    locked.chmod(0)
+    try:
+        assert ids(check_skill(skill, ())) == ["S13"]
+    finally:
+        locked.chmod(0o755)
+
+
+def test_s9_compile_warning_does_not_echo_source(tmp_path, capfd):
+    skill = make_skill(tmp_path)
+    (skill / "scripts").mkdir()
+    (skill / "scripts" / "esc.py").write_text('x = "\\d MARKERTEXT"\n', encoding="utf-8")
+    assert check_skill(skill, ()) == []
+    captured = capfd.readouterr()
+    assert "MARKERTEXT" not in captured.out + captured.err
+
+
+@pytest.mark.parametrize("source", ["x = " + "-" * 200000 + "1\n", "(" * 100000 + ")" * 100000 + "\n"])
+def test_s9_pathological_source_is_a_finding(tmp_path, source):
+    skill = make_skill(tmp_path)
+    (skill / "scripts").mkdir()
+    (skill / "scripts" / "deep.py").write_text(source, encoding="utf-8")
+    assert ids(check_skill(skill, ())) == ["S9"]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="symlinks need privileges on Windows")
+def test_s12_symlinked_directory(tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "x.md").write_text(f"password = '{LIVE}'\n", encoding="utf-8")
+    skill = make_skill(tmp_path)
+    (skill / "linkdir").symlink_to(outside, target_is_directory=True)
+    assert ids(check_skill(skill, ())) == ["S12"]
