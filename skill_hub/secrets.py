@@ -81,7 +81,8 @@ def _scan_line(line: str) -> str | None:
 
 def scan_text(text: str) -> list[SecretHit]:
     hits = []
-    for number, line in enumerate(text.splitlines(), start=1):
+    for number, line in enumerate(text.split("\n"), start=1):  # not splitlines(): line numbers must match editors
+        line = line.removesuffix("\r")
         if ALLOW_MARKER in line:
             continue
         kind = _scan_line(line)

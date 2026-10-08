@@ -113,3 +113,8 @@ def test_allow_marker_skips_line():
 def test_reports_line_numbers():
     hits = scan_text(f"ok\n\npassword = '{LIVE}'\n")
     assert [(hit.line, hit.kind) for hit in hits] == [(3, "credential assignment")]
+
+
+def test_line_numbers_match_editors_not_splitlines():
+    text = "a\x0cb\u2028c\x85d\r\npassword = '" + LIVE + "'\n"
+    assert [hit.line for hit in scan_text(text)] == [2]

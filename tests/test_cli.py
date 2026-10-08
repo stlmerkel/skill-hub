@@ -2,6 +2,8 @@ import subprocess
 import sys
 
 from skill_hub.cli import main
+from skill_hub.findings import WARNING, Finding
+from skill_hub.qa import QaResult
 from tests.conftest import GOOD_HUB, make_skill, skill_md, write_hub
 
 SECRET = "AKIA" + "Q" * 16
@@ -72,3 +74,10 @@ def test_one_broken_skill_does_not_hide_another(tmp_path, capsys):
     assert "S3 src/aaa-broken/SKILL.md" in out
     assert "S9 src/zzz-other/tool.py" in out
     assert "S10 src/zzz-other/SKILL.md" in out
+
+
+def test_non_utf8_filename_does_not_crash_output(tmp_path, capsys, monkeypatch):
+    bad = QaResult([Finding(WARNING, "S12", "src/x/bad\udcff.txt", "not a regular file; not scanned")], 1)
+    monkeypatch.setattr("skill_hub.cli.run_qa", lambda root: bad)
+    assert main(["qa", "--root", str(tmp_path)]) == 0
+    assert "src/x/bad\\udcff.txt" in capsys.readouterr().out

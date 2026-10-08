@@ -16,6 +16,8 @@ def main(argv: list[str] | None = None) -> int:
     qa.add_argument("--strict", action="store_true", help="treat warnings as errors")
     args = parser.parse_args(argv)
 
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="backslashreplace")  # undecodable filenames must not crash the report
     result = run_qa(args.root)
     print(format_report(result))
     failed = bool(result.errors) or (args.strict and bool(result.warnings))
