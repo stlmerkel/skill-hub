@@ -60,9 +60,11 @@ def run_qa(root: Path) -> QaResult:
         if entry.name.startswith("."):
             continue
         rel = f"{SRC_DIR}/{entry.name}"
+        # os.lstat, not Path.is_dir(): on Python 3.14 pathlib returns False on EACCES instead of raising.
         try:
-            is_symlink = entry.is_symlink()
-            is_dir = not is_symlink and entry.is_dir()
+            mode = os.lstat(entry).st_mode
+            is_symlink = stat.S_ISLNK(mode)
+            is_dir = stat.S_ISDIR(mode)
         except OSError:
             findings.append(Finding(ERROR, "S13", rel, "entry could not be read"))
             continue
