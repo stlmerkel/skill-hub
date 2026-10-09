@@ -97,6 +97,7 @@ The rules QA enforces:
 | S11 | `SKILL.md` has instructions after the frontmatter | warning |
 | S12 | Symlinks and non-regular files are skipped | warning |
 | S13 | A file or folder in the skill could not be read | error |
+| S14 | `description` is still the placeholder written by `skill-hub new-skill` | warning |
 | R1 | `src/` exists and can be read | error |
 | R2 | `src/` holds at least one skill | error |
 | R3 | A loose file sits directly in `src/` | warning |

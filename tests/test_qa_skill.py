@@ -5,8 +5,9 @@ import warnings
 
 import pytest
 
-from skill_hub.qa import check_skill
-from tests.conftest import ids, make_skill, skill_md
+from skill_hub.contract import SCAFFOLD_DESCRIPTION
+from skill_hub.qa import check_skill, run_qa
+from tests.conftest import ids, make_skill, skill_md, write_hub
 
 LIVE = "s3cr3t" + "Value99"
 
@@ -290,3 +291,36 @@ def test_non_regular_file_is_skipped_with_warning(tmp_path):
     assert [(f.level, f.check_id, f.path, f.message) for f in findings] == [
         ("warning", "S12", "src/changelog-formatter/pipe", "not a regular file; not scanned")
     ]
+
+
+def _placeholder_skill(description_yaml: str) -> str:
+    return skill_md("changelog-formatter").replace(
+        'description: "Formats changelog entries. Use when the user asks to write or tidy a changelog."',
+        f"description: {description_yaml}",
+    )
+
+
+def test_scaffold_placeholder_description_is_s14_warning(tmp_path):
+    write_hub(tmp_path)
+    make_skill(tmp_path, text=_placeholder_skill(f'"{SCAFFOLD_DESCRIPTION}"'))
+    result = run_qa(tmp_path)
+    assert result.errors == []
+    assert [(f.check_id, f.path) for f in result.warnings] == [("S14", "src/changelog-formatter/SKILL.md")]
+
+
+def test_s14_ignores_surrounding_whitespace(tmp_path):
+    write_hub(tmp_path)
+    make_skill(tmp_path, text=_placeholder_skill(f'"  {SCAFFOLD_DESCRIPTION} "'))
+    assert ids(run_qa(tmp_path).warnings) == ["S14"]
+
+
+def test_real_description_has_no_s14(tmp_path):
+    write_hub(tmp_path)
+    make_skill(tmp_path)
+    assert "S14" not in ids(run_qa(tmp_path).findings)
+
+
+def test_description_mentioning_todo_has_no_s14(tmp_path):
+    write_hub(tmp_path)
+    make_skill(tmp_path, text=_placeholder_skill('"TODO list manager. Use when the user asks to track tasks."'))
+    assert "S14" not in ids(run_qa(tmp_path).findings)
