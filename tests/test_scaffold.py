@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 from pathlib import Path
@@ -6,8 +7,9 @@ import pytest
 
 from skill_hub.contract import NAME_RULE, SCAFFOLD_DESCRIPTION
 from skill_hub.qa import run_qa
+from skill_hub.releases import RELEASE_CONFIG, RELEASE_MANIFEST
 from skill_hub.scaffold import ScaffoldError, create_skill, render_skill
-from tests.conftest import make_skill, write_hub
+from tests.conftest import make_skill, skill_md, write_hub
 
 ALREADY = "src/pdf-tidy already exists; choose another name or remove it"
 COULD_NOT_WRITE = "could not write src/pdf-tidy/SKILL.md"
@@ -30,7 +32,8 @@ def refuse(root: Path, name: str, message: str) -> None:
 def test_scaffolded_skill_passes_qa_with_only_s14(tmp_path):
     write_hub(tmp_path)
     make_skill(tmp_path)
-    assert create_skill(tmp_path, "pdf-tidy") == "src/pdf-tidy/SKILL.md"
+    created = create_skill(tmp_path, "pdf-tidy")
+    assert (created.path, created.registered) == ("src/pdf-tidy/SKILL.md", False)
     result = run_qa(tmp_path)
     assert result.errors == []
     assert [(f.check_id, f.path) for f in result.warnings] == [("S14", "src/pdf-tidy/SKILL.md")]
@@ -169,3 +172,87 @@ def test_failed_write_removes_the_new_folder(tmp_path, monkeypatch):
         create_skill(tmp_path, "pdf-tidy")
     assert str(caught.value) == COULD_NOT_WRITE
     assert not (tmp_path / "src" / "pdf-tidy").exists()
+
+
+KIT_CONFIG = (Path(__file__).parent.parent / RELEASE_CONFIG).read_text(encoding="utf-8")
+
+
+def release_hub(root: Path, config_text: str = KIT_CONFIG) -> None:
+    write_hub(root)
+    make_skill(root, "example-skill", skill_md("example-skill", version='"0.1.0"'))  # matches initial-version
+    (root / RELEASE_CONFIG).write_text(config_text, encoding="utf-8")
+    (root / RELEASE_MANIFEST).write_text("{}\n", encoding="utf-8")
+
+
+def test_registers_new_skill_last_in_packages(tmp_path):
+    release_hub(tmp_path)
+    created = create_skill(tmp_path, "pdf-tidy")
+    assert created.registered is True
+    config = json.loads((tmp_path / RELEASE_CONFIG).read_text(encoding="utf-8"))
+    assert list(config["packages"]) == ["src/example-skill", "src/pdf-tidy"]
+    assert config["packages"]["src/pdf-tidy"] == {"component": "pdf-tidy", "extra-files": ["SKILL.md"]}
+    assert (tmp_path / RELEASE_MANIFEST).read_text(encoding="utf-8") == "{}\n"
+
+
+def test_registration_keeps_kit_formatting(tmp_path):
+    release_hub(tmp_path)
+    create_skill(tmp_path, "pdf-tidy")
+    expected = KIT_CONFIG.replace(
+        '      ]\n    }\n  }\n}\n',
+        '      ]\n    },\n    "src/pdf-tidy": {\n      "component": "pdf-tidy",\n'
+        '      "extra-files": [\n        "SKILL.md"\n      ]\n    }\n  }\n}\n',
+    )
+    assert (tmp_path / RELEASE_CONFIG).read_text(encoding="utf-8") == expected
+
+
+def test_registration_keeps_non_ascii_unescaped(tmp_path):
+    release_hub(tmp_path, '{"$comment": "café skills", "packages": {}}\n')
+    create_skill(tmp_path, "pdf-tidy")
+    text = (tmp_path / RELEASE_CONFIG).read_text(encoding="utf-8")
+    assert '"src/pdf-tidy"' in text
+    assert '"$comment": "café skills"' in text
+
+
+@pytest.mark.parametrize("name", ["pdf-tidy", "true", "2024"])
+def test_registered_skill_passes_qa_with_only_s14(tmp_path, name):
+    release_hub(tmp_path)
+    create_skill(tmp_path, name)
+    result = run_qa(tmp_path)
+    assert result.errors == []
+    assert [f.check_id for f in result.warnings] == ["S14"]
+
+
+@pytest.mark.parametrize("text", ["{not json", "[]", '{"release-type": "simple"}', '{"packages": []}'])
+def test_invalid_release_config_refuses(tmp_path, text):
+    release_hub(tmp_path, text)
+    refuse(tmp_path, "pdf-tidy", "release-please-config.json is not a valid release config; fix it or run skill-hub qa")
+
+
+@pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="permissions not enforced")
+def test_unreadable_release_config_refuses(tmp_path):
+    release_hub(tmp_path)
+    config = tmp_path / RELEASE_CONFIG
+    config.chmod(0)
+    try:
+        refuse(tmp_path, "pdf-tidy", "could not read release-please-config.json")
+    finally:
+        config.chmod(0o644)
+
+
+def test_failed_config_write_rolls_back(tmp_path, monkeypatch):
+    release_hub(tmp_path)
+    before = tree(tmp_path)
+    original = (tmp_path / RELEASE_CONFIG).read_bytes()
+    real_write_text = Path.write_text
+
+    def fail_config(self, *args, **kwargs):
+        if self.name == RELEASE_CONFIG:
+            raise OSError("disk full")
+        return real_write_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", fail_config)
+    with pytest.raises(ScaffoldError) as caught:
+        create_skill(tmp_path, "pdf-tidy")
+    assert str(caught.value) == "could not write release-please-config.json"
+    assert tree(tmp_path) == before
+    assert (tmp_path / RELEASE_CONFIG).read_bytes() == original

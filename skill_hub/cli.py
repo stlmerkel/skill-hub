@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from skill_hub.qa import format_report, run_qa
+from skill_hub.releases import RELEASE_CONFIG
 from skill_hub.scaffold import ScaffoldError, create_skill
 
 
@@ -26,7 +27,9 @@ def main(argv: list[str] | None = None) -> int:
         except ScaffoldError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 1
-        print(f"Created {created}")
+        print(f"Created {created.path}")
+        if not created.registered:
+            print(f"Release registration skipped: no {RELEASE_CONFIG}")
         print("Next: replace the placeholder description and instructions, then run `uv run skill-hub qa`.")
         return 0
 

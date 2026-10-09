@@ -1,3 +1,4 @@
+import json
 import subprocess
 import sys
 
@@ -92,6 +93,7 @@ def test_new_skill_creates_and_reports(tmp_path, capsys):
     out = capsys.readouterr()
     assert out.out.splitlines() == [
         "Created src/pdf-tidy/SKILL.md",
+        "Release registration skipped: no release-please-config.json",
         "Next: replace the placeholder description and instructions, then run `uv run skill-hub qa`.",
     ]
     assert out.err == ""
@@ -133,3 +135,16 @@ def test_new_skill_failure_has_no_traceback(tmp_path):
     )
     assert result.returncode == 1
     assert result.stderr == "error: src is not a directory\n"
+
+
+def test_new_skill_registered_has_no_skip_line(tmp_path, capsys):
+    write_hub(tmp_path)
+    (tmp_path / "release-please-config.json").write_text(json.dumps({"packages": {}}), encoding="utf-8")
+    (tmp_path / ".release-please-manifest.json").write_text("{}", encoding="utf-8")
+    assert main(["new-skill", "pdf-tidy", "--root", str(tmp_path)]) == 0
+    assert capsys.readouterr().out.splitlines() == [
+        "Created src/pdf-tidy/SKILL.md",
+        "Next: replace the placeholder description and instructions, then run `uv run skill-hub qa`.",
+    ]
+    config = json.loads((tmp_path / "release-please-config.json").read_text(encoding="utf-8"))
+    assert "src/pdf-tidy" in config["packages"]
