@@ -174,7 +174,8 @@ def test_failed_write_removes_the_new_folder(tmp_path, monkeypatch):
     assert not (tmp_path / "src" / "pdf-tidy").exists()
 
 
-KIT_CONFIG = (Path(__file__).parent.parent / RELEASE_CONFIG).read_text(encoding="utf-8")
+# The shipped config, from the snapshot: the live root copy is the adopter's and changes with their skills.
+KIT_CONFIG = (Path(__file__).parent / "fixtures" / "default-clone" / RELEASE_CONFIG).read_text(encoding="utf-8")
 
 
 def release_hub(root: Path, config_text: str = KIT_CONFIG) -> None:
