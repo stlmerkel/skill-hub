@@ -12,7 +12,7 @@ skill-hub is not a marketplace itself. It is the scaffolding for yours: everythi
 |---|---|---|
 | **Skill contract** | Each skill is a folder under `src/` with a `SKILL.md` that follows the [Agent Skills specification](https://agentskills.io/specification), so it installs in any client that reads the spec | Available |
 | **QA guard** | `skill-hub qa` checks your hub config and every skill: valid frontmatter, a name that matches its folder, a SemVer version, Python that compiles, and no committed secrets. It runs locally and on every pull request | Available |
-| **Semantic releases** | Conventional commits (`feat:`, `fix:`) drive version bumps and changelogs through [Release Please](https://github.com/googleapis/release-please), one version per skill | Planned |
+| **Semantic releases** | Conventional commits (`feat:`, `fix:`) drive version bumps and changelogs through [Release Please](https://github.com/googleapis/release-please), one version per skill | Available |
 | **Marketplace page** | A static, browsable catalog of your skills, built from `src/` and deployed to the host you choose (no GitHub Pages lock-in) | Planned |
 | **Client install paths** | Install a skill from your hub into Claude Code, Cursor or GitHub Copilot by a documented path | Planned |
 | **Skill scaffolding** | `skill-hub new-skill <name>` creates a skill that already passes QA | Available |
@@ -43,9 +43,12 @@ src/<skill>/...            optional scripts/, references/, assets/
 skill_hub/                 the QA tool (part of the kit)
 tests/                     the kit's own tests
 .github/workflows/qa.yml   runs tests and skill-hub qa on every pull request
+.github/workflows/release.yml  opens release PRs and tags skill releases
+release-please-config.json     which skills Release Please versions (skill-hub new-skill adds to it)
+.release-please-manifest.json  each skill's last released version (Release Please maintains it)
 ```
 
-You own `hub.yml` and `src/`. Everything else belongs to the kit, which keeps pulling in kit updates simple. New config keys are always optional with a default, so your `hub.yml` keeps working.
+You own `hub.yml`, `src/` and the two release files, which list your skills. Everything else belongs to the kit, which keeps pulling in kit updates simple. New config keys are always optional with a default, so your `hub.yml` keeps working.
 
 ## Writing a skill
 
@@ -69,8 +72,24 @@ The rules QA enforces:
 - **Frontmatter keys:** only the six from the Agent Skills spec: `name`, `description`, `license`, `compatibility`, `metadata`, `allowed-tools`. Strict consumers such as claude.ai uploads reject anything else. If your hub only targets Claude Code, you can allow its extra keys (for example `when_to_use`) in `hub.yml` under `qa.allow_keys`.
 - **`name`:** 1 to 64 characters of lowercase letters, digits and single hyphens, matching the folder name.
 - **`description`:** up to 1024 characters. Say what the skill does and when to use it, since that is how agents decide to load it.
-- **Version:** a quoted SemVer string in `metadata.version`. A top-level `version` key is not part of the spec and fails QA. Keep the `# x-release-please-version` marker on that line; release automation will use it.
+- **Version:** a quoted SemVer string in `metadata.version`. A top-level `version` key is not part of the spec and fails QA. Keep the `# x-release-please-version` marker on that line: Release Please bumps the version there.
 - **Secrets:** every file in a skill, hidden files included, is scanned for known token shapes and credential assignments. For a deliberate example in documentation, put `skill-hub: allow-secret` on that line.
+
+## Releasing a skill
+
+Each skill has its own version, bumped by [Release Please](https://github.com/googleapis/release-please) from your commit messages:
+
+- `fix:` bumps the patch version, `feat:` the minor, and a breaking change (`feat!:` or a `BREAKING CHANGE:` footer) the major. To force a version, add a `Release-As: 1.0.0` footer.
+- A commit counts toward a skill when it changes files in that skill's folder.
+
+On every push to `main`, the release workflow opens or updates one release PR. Merging it bumps each changed skill's `metadata.version`, writes its `CHANGELOG.md` and `version.txt`, and tags the release `<skill>-v<version>`. A skill's first release is `0.1.0`. Leave `version.txt` in place: Release Please rewrites it on every release, and QA (S15) checks it matches `metadata.version`.
+
+Before your first release:
+
+1. **Let Actions open pull requests.** In your repository, go to Settings → Actions → General and turn on "Allow GitHub Actions to create and approve pull requests".
+2. **Optional: run QA on release PRs.** A PR opened with GitHub's default token does not trigger other workflows, so QA runs on `main` after the release PR merges, not on the PR. If you require checks before merging, create a fine-grained personal access token (or a GitHub App token) with contents and pull-request write access, and save it as the `RELEASE_PLEASE_TOKEN` Actions secret.
+
+`skill-hub new-skill` registers each new skill in `release-please-config.json`. To opt out of releases, delete `release-please-config.json` and `.release-please-manifest.json`; QA then skips its release checks.
 
 ## QA checks
 
@@ -114,10 +133,8 @@ Run `uv run ruff check`, `uv run pytest` and `uv run skill-hub qa` before openin
 
 ## Roadmap
 
-1. **Semantic releases:** Release Please in manifest mode, one component per skill, bumping `metadata.version` and writing changelogs.
-2. **Catalog and marketplace page:** build a catalog from `src/` and a static page from it; the deploy step is swappable so you can use Cloudflare Pages, Netlify, an S3 bucket or your own server.
-3. **Client install paths:** documented install for Claude Code, Cursor and GitHub Copilot, possibly an [Open Plugins](https://open-plugins.com) `marketplace.json` as well.
-4. **Skill scaffolding:** `skill-hub new-skill`.
+1. **Catalog and marketplace page:** build a catalog from `src/` and a static page from it; the deploy step is swappable so you can use Cloudflare Pages, Netlify, an S3 bucket or your own server.
+2. **Client install paths:** documented install for Claude Code, Cursor and GitHub Copilot, possibly an [Open Plugins](https://open-plugins.com) `marketplace.json` as well.
 
 ## Prior art
 
