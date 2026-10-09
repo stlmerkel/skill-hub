@@ -84,3 +84,52 @@ def test_non_utf8_filename_does_not_crash_output(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr("skill_hub.cli.run_qa", lambda root: bad)
     assert main(["qa", "--root", str(tmp_path)]) == 0
     assert "src/x/bad\\udcff.txt" in capsys.readouterr().out
+
+
+def test_new_skill_creates_and_reports(tmp_path, capsys):
+    write_hub(tmp_path)
+    assert main(["new-skill", "pdf-tidy", "--root", str(tmp_path)]) == 0
+    out = capsys.readouterr()
+    assert out.out.splitlines() == [
+        "Created src/pdf-tidy/SKILL.md",
+        "Next: replace the placeholder description and instructions, then run `uv run skill-hub qa`.",
+    ]
+    assert out.err == ""
+    assert (tmp_path / "src" / "pdf-tidy" / "SKILL.md").is_file()
+
+
+def test_new_skill_refusal_exits_one_on_stderr(tmp_path, capsys):
+    write_hub(tmp_path)
+    assert main(["new-skill", "Bad_Name", "--root", str(tmp_path)]) == 1
+    out = capsys.readouterr()
+    assert out.out == ""
+    assert out.err == (
+        "error: name must be 1-64 characters of a-z, 0-9 and single hyphens, "
+        "with no leading or trailing hyphen\n"
+    )
+
+
+def test_new_skill_then_qa_passes(tmp_path, capsys):
+    write_hub(tmp_path)
+    main(["new-skill", "pdf-tidy", "--root", str(tmp_path)])
+    assert main(["qa", "--root", str(tmp_path)]) == 0
+    assert main(["qa", "--root", str(tmp_path), "--strict"]) == 1
+
+
+def test_new_skill_listed_in_help():
+    result = subprocess.run(
+        [sys.executable, "-m", "skill_hub.cli", "--help"], capture_output=True, text=True, check=True
+    )
+    assert "new-skill" in result.stdout
+
+
+def test_new_skill_failure_has_no_traceback(tmp_path):
+    (tmp_path / "hub.yml").write_text("x", encoding="utf-8")
+    (tmp_path / "src").write_text("x", encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, "-m", "skill_hub.cli", "new-skill", "pdf-tidy", "--root", str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert result.stderr == "error: src is not a directory\n"
