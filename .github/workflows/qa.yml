@@ -11,11 +11,14 @@ permissions:
 jobs:
   qa:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.14"]
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
       - run: uv sync --locked
       - run: uv run --locked pytest
       - run: uv run --locked skill-hub qa
