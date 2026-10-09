@@ -106,7 +106,7 @@ The rules QA enforces:
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, `chore:`). Once releases are wired up, these prefixes decide each skill's next version, so pick them with care: `feat` for new behaviour, `fix` for corrected behaviour.
 
-Run `uv run pytest` and `uv run skill-hub qa` before opening a pull request. CI runs both.
+Run `uv run ruff check`, `uv run pytest` and `uv run skill-hub qa` before opening a pull request. CI runs all three. To lint on every commit, install the hook once with `uv run pre-commit install`.
 
 ## Roadmap
 

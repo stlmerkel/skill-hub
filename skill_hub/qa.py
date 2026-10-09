@@ -166,9 +166,10 @@ def _check_fields(fm: dict, key_lines, dir_name: str, md: str, allow_keys: tuple
             continue
         file_line = line + FRONTMATTER_LINE_OFFSET
         if raw_key == "version":
-            error("S6", 'move "version" to metadata.version; a top-level version is not part of the Agent Skills spec', file_line)
+            message = 'move "version" to metadata.version; a top-level version is not part of the Agent Skills spec'
         else:
-            error("S6", "unexpected top-level key; allowed are the Agent Skills spec keys plus qa.allow_keys in hub.yml", file_line)
+            message = "unexpected top-level key; allowed are the Agent Skills spec keys plus qa.allow_keys in hub.yml"
+        error("S6", message, file_line)
 
     # S7 metadata.version
     metadata = fm.get("metadata")
@@ -219,7 +220,8 @@ def _check_files(skill_dir: Path, rel: str) -> list[Finding]:
                 linked = False  # os.walk reports the unreadable directory itself via onerror
             if linked:
                 dirnames.remove(name)
-                findings.append(Finding(WARNING, "S12", _rel(skill_dir, base / name, rel), "symlink is not followed or scanned"))
+                link_rel = _rel(skill_dir, base / name, rel)
+                findings.append(Finding(WARNING, "S12", link_rel, "symlink is not followed or scanned"))
         dirnames.sort()
         for name in sorted(filenames):
             path = base / name
@@ -246,15 +248,21 @@ def _check_files(skill_dir: Path, rel: str) -> list[Finding]:
                         warnings.simplefilter("ignore")
                         compile(raw, str(path), "exec")
                 except (SyntaxError, ValueError, MemoryError, RecursionError) as exc:
-                    findings.append(Finding(ERROR, "S9", path_rel, "Python file does not compile", getattr(exc, "lineno", None)))
+                    lineno = getattr(exc, "lineno", None)
+                    findings.append(Finding(ERROR, "S9", path_rel, "Python file does not compile", lineno))
             try:
                 text = raw.decode("utf-8")
             except UnicodeDecodeError:
                 if len(raw) > BINARY_WARN_BYTES:
-                    findings.append(Finding(WARNING, "S10", path_rel, "binary file over 1 MB was not scanned for secrets"))
+                    message = "binary file over 1 MB was not scanned for secrets"
+                    findings.append(Finding(WARNING, "S10", path_rel, message))
                 continue
             for hit in scan_text(text):
-                findings.append(Finding(ERROR, "S10", path_rel, f"possible secret ({hit.kind}); remove it, or mark a deliberate example with 'skill-hub: allow-secret'", hit.line))
+                message = (
+                    f"possible secret ({hit.kind}); remove it, "
+                    "or mark a deliberate example with 'skill-hub: allow-secret'"
+                )
+                findings.append(Finding(ERROR, "S10", path_rel, message, hit.line))
     return findings
 
 

@@ -25,7 +25,8 @@ def test_valid_semver(version):
 
 @pytest.mark.parametrize(
     "version",
-    ["01.2.3", "1.2.3-01", "1.2", "1.2.3-", "1.2.3+", "1.2.3\n", " 1.2.3", "1.2.3 ", "١.2.3", "1١.2.3", "v1.2.3"],
+    ["01.2.3", "1.2.3-01", "1.2", "1.2.3-", "1.2.3+", "1.2.3\n", " 1.2.3", "1.2.3 ",
+     "\u0661.2.3", "1\u0661.2.3", "v1.2.3"],
 )
 def test_invalid_semver(version):
     assert not is_valid_semver(version)

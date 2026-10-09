@@ -7,7 +7,10 @@ ALLOW_MARKER = "skill-hub: allow-secret"
 
 _TOKENS = (
     ("AWS access key", re.compile(r"(?<![A-Za-z0-9])(?:AKIA|ASIA)[0-9A-Z]{16}")),
-    ("GitHub token", re.compile(r"(?<![A-Za-z0-9])gh[pousr]_[A-Za-z0-9]{36,}|(?<![A-Za-z0-9])github_pat_[A-Za-z0-9_]{22,}")),
+    ("GitHub token", re.compile(
+        r"(?<![A-Za-z0-9])gh[pousr]_[A-Za-z0-9]{36,}"
+        r"|(?<![A-Za-z0-9])github_pat_[A-Za-z0-9_]{22,}"
+    )),
     ("Slack token", re.compile(r"(?<![A-Za-z0-9])xox[abprs]-[A-Za-z0-9-]{10,}")),
     ("sk- API key", re.compile(r"(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{20,}")),
     ("Google API key", re.compile(r"(?<![A-Za-z0-9])AIza[0-9A-Za-z_-]{35}")),
