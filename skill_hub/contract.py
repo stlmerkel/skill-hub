@@ -13,6 +13,11 @@ SPEC_KEYS = frozenset({"name", "description", "license", "compatibility", "metad
 DEFAULT_HUB_NAME = "my-skill-hub"
 DEFAULT_REPO_URL = "https://github.com/you/your-hub"
 
+# Written by `skill-hub new-skill` and flagged by QA check S14 until replaced.
+SCAFFOLD_DESCRIPTION = "TODO: say what this skill does and when an agent should use it."
+
+NAME_RULE = "name must be 1-64 characters of a-z, 0-9 and single hyphens, with no leading or trailing hyphen"
+
 _NAME_RE = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*", re.ASCII)
 
 # Official SemVer 2.0.0 regex from semver.org, without ^/$ (fullmatch anchors it).

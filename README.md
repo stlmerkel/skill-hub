@@ -15,7 +15,7 @@ skill-hub is not a marketplace itself. It is the scaffolding for yours: everythi
 | **Semantic releases** | Conventional commits (`feat:`, `fix:`) drive version bumps and changelogs through [Release Please](https://github.com/googleapis/release-please), one version per skill | Planned |
 | **Marketplace page** | A static, browsable catalog of your skills, built from `src/` and deployed to the host you choose (no GitHub Pages lock-in) | Planned |
 | **Client install paths** | Install a skill from your hub into Claude Code, Cursor or GitHub Copilot by a documented path | Planned |
-| **Skill scaffolding** | `skill-hub new-skill <name>` creates a skill that already passes QA | Planned |
+| **Skill scaffolding** | `skill-hub new-skill <name>` creates a skill that already passes QA | Available |
 
 ## Quick start
 
@@ -31,7 +31,7 @@ uv run skill-hub qa
 A fresh clone passes with two warnings. They are reminders to make the hub yours:
 
 1. **Edit `hub.yml`.** Set `hub.name` (lowercase letters, digits and single hyphens), `display_name`, `owner`, `description` and `repo_url`. Every skill-hub command reads identity from this file and nowhere else.
-2. **Replace the example skill.** `src/example-skill/` shows the shape of a skill. Rewrite it, or delete it once you have your own.
+2. **Replace the example skill.** `src/example-skill/` shows the shape of a skill. Create your own with `uv run skill-hub new-skill <name>`, then delete the example once you have real skills. QA warns (S14) until you replace the new skill's placeholder description.
 3. **Run `uv run skill-hub qa` again.** With no warnings left, your hub is ready for skills.
 
 ## Layout
@@ -97,6 +97,7 @@ The rules QA enforces:
 | S11 | `SKILL.md` has instructions after the frontmatter | warning |
 | S12 | Symlinks and non-regular files are skipped | warning |
 | S13 | A file or folder in the skill could not be read | error |
+| S14 | `description` is still the placeholder written by `skill-hub new-skill` | warning |
 | R1 | `src/` exists and can be read | error |
 | R2 | `src/` holds at least one skill | error |
 | R3 | A loose file sits directly in `src/` | warning |

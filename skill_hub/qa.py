@@ -1,5 +1,5 @@
 # skill_hub/qa.py
-"""Skill checks (S1-S13), run checks (R1-R4), and the QA runner."""
+"""Skill checks (S1-S14), run checks (R1-R4), and the QA runner."""
 
 import os
 import stat
@@ -11,6 +11,8 @@ from skill_hub.config import check_hub
 from skill_hub.contract import (
     COMPATIBILITY_MAX,
     DESCRIPTION_MAX,
+    NAME_RULE,
+    SCAFFOLD_DESCRIPTION,
     SPEC_KEYS,
     is_blank,
     is_valid_name,
@@ -144,7 +146,7 @@ def _check_fields(fm: dict, key_lines, dir_name: str, md: str, allow_keys: tuple
     elif not isinstance(name, str):
         error("S4", f"name must be a string, found {type_name(name)}; quote it")
     elif not is_valid_name(name):
-        error("S4", "name must be 1-64 characters of a-z, 0-9 and single hyphens, with no leading or trailing hyphen")
+        error("S4", NAME_RULE)
     elif name != dir_name:
         error("S4", f'name does not match directory "{dir_name}"')
 
@@ -158,6 +160,10 @@ def _check_fields(fm: dict, key_lines, dir_name: str, md: str, allow_keys: tuple
         error("S5", "description is empty")
     elif len(description) > DESCRIPTION_MAX:
         error("S5", f"description is {len(description)} characters; the limit is {DESCRIPTION_MAX}")
+
+    # S14 scaffold placeholder
+    if isinstance(description, str) and description.strip() == SCAFFOLD_DESCRIPTION:
+        findings.append(Finding(WARNING, "S14", md, "description is still the scaffold placeholder; replace it"))
 
     # S6 top-level keys, checked as written
     allowed = SPEC_KEYS | set(allow_keys)
