@@ -4,7 +4,7 @@ A starter kit for standing up your own agent-skill marketplace. Clone it, set yo
 
 skill-hub is not a marketplace itself. It is the scaffolding for yours: everything that identifies your hub lives in one config file, and the skills are yours.
 
-> **Work in progress.** The skill contract and the QA guard work today. Releases, the marketplace page and client install paths are next; see [Roadmap](#roadmap).
+> **Work in progress.** The skill contract, the QA guard, skill scaffolding and releases work today. The marketplace page and client install paths are next; see [Roadmap](#roadmap).
 
 ## What you get
 
@@ -59,7 +59,7 @@ A skill is a folder whose name matches the `name` in its `SKILL.md`:
 name: changelog-formatter
 description: "Formats changelog entries. Use when the user asks to write or tidy a changelog."
 metadata:
-  version: "1.0.0" # x-release-please-version
+  version: "0.1.0" # x-release-please-version
 ---
 
 # Changelog formatter
@@ -82,7 +82,7 @@ Each skill has its own version, bumped by [Release Please](https://github.com/go
 - `fix:` bumps the patch version, `feat:` the minor, and a breaking change (`feat!:` or a `BREAKING CHANGE:` footer) the major. To force a version, add a `Release-As: 1.0.0` footer.
 - A commit counts toward a skill when it changes files in that skill's folder.
 
-On every push to `main`, the release workflow opens or updates one release PR. Merging it bumps each changed skill's `metadata.version`, writes its `CHANGELOG.md` and `version.txt`, and tags the release `<skill>-v<version>`. A skill's first release is `0.1.0`. Leave `version.txt` in place: Release Please rewrites it on every release, and QA (S15) checks it matches `metadata.version`.
+On every push to `main`, the release workflow opens or updates one release PR. Merging it bumps each changed skill's `metadata.version`, writes its `CHANGELOG.md`, and tags the release `<skill>-v<version>`. A skill's first release is `0.1.0`, whatever its `metadata.version` says. If you bring in a skill that is already at a higher version, add a `Release-As: <that version>` footer to a commit that changes it before its first release; QA warns (S16) until that first release.
 
 Before your first release:
 
@@ -117,7 +117,8 @@ Before your first release:
 | S12 | Symlinks and non-regular files are skipped | warning |
 | S13 | A file or folder in the skill could not be read | error |
 | S14 | `description` is still the placeholder written by `skill-hub new-skill` | warning |
-| S15 | `metadata.version` matches the skill's `version.txt` and its manifest entry, where those exist | error |
+| S15 | `metadata.version` matches the skill's manifest entry, and its `version.txt` if it has one | error |
+| S16 | A registered skill that has never been released has a `metadata.version` other than its first-release version (`initial-version`), which the first release would overwrite | warning |
 | R1 | `src/` exists and can be read | error |
 | R2 | `src/` holds at least one skill | error |
 | R3 | A loose file sits directly in `src/` | warning |
@@ -127,7 +128,7 @@ Before your first release:
 
 ## Contributing
 
-Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, `chore:`). Once releases are wired up, these prefixes decide each skill's next version, so pick them with care: `feat` for new behaviour, `fix` for corrected behaviour.
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, `chore:`). These prefixes decide each skill's next version, so pick them with care: `feat` for new behaviour, `fix` for corrected behaviour.
 
 Run `uv run ruff check`, `uv run pytest` and `uv run skill-hub qa` before opening a pull request. CI runs all three. To lint on every commit, install the hook once with `uv run pre-commit install`.
 
@@ -140,7 +141,7 @@ Run `uv run ruff check`, `uv run pytest` and `uv run skill-hub qa` before openin
 
 skill-hub borrows ideas from these projects, without sharing code:
 
-- [googleapis/release-please](https://github.com/googleapis/release-please): conventional-commit releases, the planned versioning engine.
+- [googleapis/release-please](https://github.com/googleapis/release-please): conventional-commit releases, the versioning engine.
 - [ai-plugin-marketplace/tools](https://github.com/ai-plugin-marketplace/tools): a TypeScript toolkit that builds plugin marketplaces for several AI clients. skill-hub stays independent of it, to keep a single config file, a skill-as-folder model, Copilot support and a Python-only toolchain, and borrows its default-name warning and strict name rule.
 - [dukelyuu/skills-marketplace](https://github.com/dukelyuu/skills-marketplace): a full-stack skill marketplace app; a reference for what a catalog page should show.
 - [WesleySmits/agent-skills](https://github.com/WesleySmits/agent-skills): a skills library with per-client pointer files; a reference for cross-client install patterns.

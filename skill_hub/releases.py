@@ -10,6 +10,7 @@ RELEASE_CONFIG = "release-please-config.json"
 RELEASE_MANIFEST = ".release-please-manifest.json"
 VERSION_FILE = "version.txt"  # written into each skill by Release Please's simple release type
 PACKAGE_PREFIX = "src/"
+DEFAULT_INITIAL_VERSION = "1.0.0"  # what Release Please releases first when initial-version is unset
 
 
 def read_json_object(path: Path) -> dict | None:
@@ -35,14 +36,14 @@ def _load(root: Path, name: str, findings: list[Finding]) -> dict | None:
     return {}
 
 
-def check_release(root: Path, skill_names: list[str]) -> tuple[list[Finding], dict[str, str]]:
-    """R5 and R6 findings, plus each skill's released version from the manifest."""
+def check_release(root: Path, skill_names: list[str]) -> tuple[list[Finding], dict[str, str], dict[str, str]]:
+    """R5 and R6 findings; each released skill's manifest version; each unreleased skill's first-release version."""
     findings: list[Finding] = []
     config = _load(root, RELEASE_CONFIG, findings)
     if config is None:
-        return [], {}  # no release config: the hub has opted out of releases
+        return [], {}, {}  # no release config: the hub has opted out of releases
     if findings:
-        return findings, {}
+        return findings, {}, {}
 
     packages = config.get("packages")
     if not isinstance(packages, dict):
@@ -76,4 +77,14 @@ def check_release(root: Path, skill_names: list[str]) -> tuple[list[Finding], di
         for key, version in manifest.items()
         if key.startswith(PACKAGE_PREFIX) and isinstance(version, str)
     }
-    return findings, released
+    default_initial = config.get("initial-version")
+    if not isinstance(default_initial, str):
+        default_initial = DEFAULT_INITIAL_VERSION
+    first_release = {}
+    for name in skill_names:
+        package = listed.get(PACKAGE_PREFIX + name)
+        if name in released or not isinstance(package, dict):
+            continue
+        initial = package.get("initial-version")
+        first_release[name] = initial if isinstance(initial, str) else default_initial
+    return findings, released, first_release

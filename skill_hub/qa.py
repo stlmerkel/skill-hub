@@ -1,5 +1,5 @@
 # skill_hub/qa.py
-"""Skill checks (S1-S15), run checks (R1-R6), and the QA runner."""
+"""Skill checks (S1-S16), run checks (R1-R6), and the QA runner."""
 
 import os
 import stat
@@ -21,7 +21,7 @@ from skill_hub.contract import (
 )
 from skill_hub.findings import ERROR, WARNING, Finding
 from skill_hub.frontmatter import FRONTMATTER_LINE_OFFSET, FrontmatterError, split_frontmatter
-from skill_hub.releases import RELEASE_MANIFEST, VERSION_FILE, check_release
+from skill_hub.releases import RELEASE_CONFIG, RELEASE_MANIFEST, VERSION_FILE, check_release
 from skill_hub.secrets import scan_text
 from skill_hub.yamlutil import load_yaml
 
@@ -80,14 +80,20 @@ def run_qa(root: Path) -> QaResult:
     if not skills:
         findings.append(Finding(ERROR, "R2", SRC_DIR, "src/ contains no skill directories"))
 
-    release_findings, released = check_release(root, [skill.name for skill in skills])
+    release_findings, released, first_release = check_release(root, [skill.name for skill in skills])
     for skill_dir in skills:
-        findings.extend(check_skill(skill_dir, allow_keys, released.get(skill_dir.name)))
+        name = skill_dir.name
+        findings.extend(check_skill(skill_dir, allow_keys, released.get(name), first_release.get(name)))
     findings.extend(release_findings)
     return QaResult(findings, len(skills))
 
 
-def check_skill(skill_dir: Path, allow_keys: tuple[str, ...], released_version: str | None = None) -> list[Finding]:
+def check_skill(
+    skill_dir: Path,
+    allow_keys: tuple[str, ...],
+    released_version: str | None = None,
+    first_release_version: str | None = None,
+) -> list[Finding]:
     rel = f"{SRC_DIR}/{skill_dir.name}"
     try:
         (skill_dir / SKILL_FILE).lstat()
@@ -95,11 +101,12 @@ def check_skill(skill_dir: Path, allow_keys: tuple[str, ...], released_version: 
         pass
     except OSError:
         return [Finding(ERROR, "S13", rel, "directory could not be read")]
-    return [*_check_skill_md(skill_dir, rel, allow_keys, released_version), *_check_files(skill_dir, rel)]
+    release = (released_version, first_release_version)
+    return [*_check_skill_md(skill_dir, rel, allow_keys, release), *_check_files(skill_dir, rel)]
 
 
 def _check_skill_md(
-    skill_dir: Path, rel: str, allow_keys: tuple[str, ...], released_version: str | None
+    skill_dir: Path, rel: str, allow_keys: tuple[str, ...], release: tuple[str | None, str | None]
 ) -> list[Finding]:
     path = skill_dir / SKILL_FILE
     md = f"{rel}/{SKILL_FILE}"
@@ -138,7 +145,7 @@ def _check_skill_md(
     return [
         *findings,
         *_check_fields(loaded.data, loaded.key_lines, skill_dir.name, md, allow_keys),
-        *_check_release_version(loaded.data, skill_dir, md, released_version),
+        *_check_release_version(loaded.data, skill_dir, md, *release),
     ]
 
 
@@ -219,8 +226,14 @@ def _check_fields(fm: dict, key_lines, dir_name: str, md: str, allow_keys: tuple
     return findings
 
 
-def _check_release_version(fm: dict, skill_dir: Path, md: str, released_version: str | None) -> list[Finding]:
-    """S15: metadata.version agrees with version.txt and the release manifest, where those exist."""
+def _check_release_version(
+    fm: dict, skill_dir: Path, md: str, released_version: str | None, first_release_version: str | None
+) -> list[Finding]:
+    """S15: metadata.version agrees with version.txt and the release manifest, where those exist.
+
+    S16: a registered skill that has never been released will be released at its initial-version,
+    whatever metadata.version says, so a higher hand-set version would silently go backwards.
+    """
     metadata = fm.get("metadata")
     version = metadata.get("version") if isinstance(metadata, dict) else None
     if not isinstance(version, str):
@@ -234,6 +247,12 @@ def _check_release_version(fm: dict, skill_dir: Path, md: str, released_version:
         findings.append(Finding(ERROR, "S15", md, f"metadata.version does not match {VERSION_FILE}"))
     if released_version is not None and released_version != version:
         findings.append(Finding(ERROR, "S15", md, f"metadata.version does not match {RELEASE_MANIFEST}"))
+    if first_release_version is not None and first_release_version != version:
+        message = (
+            f"metadata.version differs from the first-release version in {RELEASE_CONFIG}; "
+            "the first release will replace it unless a commit carries a Release-As footer"
+        )
+        findings.append(Finding(WARNING, "S16", md, message))
     return findings
 
 

@@ -9,7 +9,7 @@ from skill_hub.contract import NAME_RULE, SCAFFOLD_DESCRIPTION
 from skill_hub.qa import run_qa
 from skill_hub.releases import RELEASE_CONFIG, RELEASE_MANIFEST
 from skill_hub.scaffold import ScaffoldError, create_skill, render_skill
-from tests.conftest import make_skill, write_hub
+from tests.conftest import make_skill, skill_md, write_hub
 
 ALREADY = "src/pdf-tidy already exists; choose another name or remove it"
 COULD_NOT_WRITE = "could not write src/pdf-tidy/SKILL.md"
@@ -179,7 +179,7 @@ KIT_CONFIG = (Path(__file__).parent.parent / RELEASE_CONFIG).read_text(encoding=
 
 def release_hub(root: Path, config_text: str = KIT_CONFIG) -> None:
     write_hub(root)
-    make_skill(root, "example-skill")
+    make_skill(root, "example-skill", skill_md("example-skill", version='"0.1.0"'))  # matches initial-version
     (root / RELEASE_CONFIG).write_text(config_text, encoding="utf-8")
     (root / RELEASE_MANIFEST).write_text("{}\n", encoding="utf-8")
 

@@ -150,3 +150,44 @@ def test_s15_silent_when_version_is_not_a_string(tmp_path):
     write_release(tmp_path, entry("changelog-formatter"))
     (skill / "version.txt").write_text("1.0.0\n", encoding="utf-8")
     assert ids(run_qa(tmp_path).findings) == ["S7"]
+
+
+# S16: a registered, never-released skill whose version its first release would change
+
+def write_config(root: Path, config: dict) -> None:
+    (root / "release-please-config.json").write_text(json.dumps(config), encoding="utf-8")
+    (root / ".release-please-manifest.json").write_text("{}", encoding="utf-8")
+
+
+def test_unreleased_skill_above_initial_version_is_s16_warning(tmp_path):
+    hub_with_skill(tmp_path)  # metadata.version "1.0.0"
+    write_config(tmp_path, {"initial-version": "0.1.0", "packages": entry("changelog-formatter")})
+    result = run_qa(tmp_path)
+    assert result.errors == []
+    assert pairs(result.warnings) == [("S16", "src/changelog-formatter/SKILL.md")]
+
+
+def test_default_initial_version_is_1_0_0(tmp_path):
+    hub_with_skill(tmp_path)
+    write_config(tmp_path, {"packages": entry("changelog-formatter")})
+    assert run_qa(tmp_path).findings == []
+
+
+def test_package_initial_version_overrides_top_level(tmp_path):
+    hub_with_skill(tmp_path)
+    package = {"src/changelog-formatter": {"component": "changelog-formatter", "initial-version": "1.0.0"}}
+    write_config(tmp_path, {"initial-version": "0.1.0", "packages": package})
+    assert run_qa(tmp_path).findings == []
+
+
+def test_released_skill_has_no_s16(tmp_path):
+    hub_with_skill(tmp_path)
+    write_config(tmp_path, {"initial-version": "0.1.0", "packages": entry("changelog-formatter")})
+    (tmp_path / ".release-please-manifest.json").write_text('{"src/changelog-formatter": "1.0.0"}', encoding="utf-8")
+    assert run_qa(tmp_path).findings == []
+
+
+def test_unregistered_skill_has_no_s16(tmp_path):
+    hub_with_skill(tmp_path)
+    write_config(tmp_path, {"initial-version": "0.1.0", "packages": {}})
+    assert ids(run_qa(tmp_path).findings) == ["R5"]
