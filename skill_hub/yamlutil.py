@@ -60,7 +60,8 @@ def load_yaml(text: str) -> Loaded:
     except RecursionError:
         return Loaded(error=YamlError("is nested too deeply", None))
     except (yaml.YAMLError, ValueError, TypeError, OverflowError):
-        return Loaded(error=YamlError("contains a value YAML cannot construct (for example an invalid date); quote it", None))
+        message = "contains a value YAML cannot construct (for example an invalid date); quote it"
+        return Loaded(error=YamlError(message, None))
     finally:
         if loader is not None:
             loader.dispose()

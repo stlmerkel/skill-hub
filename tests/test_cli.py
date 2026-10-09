@@ -29,7 +29,10 @@ def test_errors_exit_one_and_report_format(tmp_path, capsys):
     make_skill(tmp_path, "foo", skill_md("Foo"))
     assert main(["qa", "--root", str(tmp_path)]) == 1
     out = capsys.readouterr().out.splitlines()
-    assert out[0] == 'ERROR S4 src/foo/SKILL.md: name must be 1-64 characters of a-z, 0-9 and single hyphens, with no leading or trailing hyphen'
+    assert out[0] == (
+        "ERROR S4 src/foo/SKILL.md: name must be 1-64 characters of a-z, 0-9 and single hyphens, "
+        "with no leading or trailing hyphen"
+    )
     assert out[-1] == "QA: 1 error, 0 warnings across 1 skill"
 
 

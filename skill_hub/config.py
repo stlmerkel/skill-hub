@@ -62,11 +62,16 @@ def check_hub(root: Path) -> tuple[list[Finding], HubConfig | None]:
                 findings.append(_error("H3", f"hub.{key} is empty"))
         name = hub.get("name")
         if isinstance(name, str) and not is_blank(name) and not is_valid_name(name):
-            findings.append(_error("H4", "hub.name must be 1-64 characters of a-z, 0-9 and single hyphens, with no leading or trailing hyphen"))
+            findings.append(_error(
+                "H4",
+                "hub.name must be 1-64 characters of a-z, 0-9 and single hyphens, with no leading or trailing hyphen",
+            ))
         if name == DEFAULT_HUB_NAME:
-            findings.append(Finding(WARNING, "H6", HUB_FILE, f"hub.name is still the default {DEFAULT_HUB_NAME!r}; set your hub's name"))
+            message = f"hub.name is still the default {DEFAULT_HUB_NAME!r}; set your hub's name"
+            findings.append(Finding(WARNING, "H6", HUB_FILE, message))
         if hub.get("repo_url") == DEFAULT_REPO_URL:
-            findings.append(Finding(WARNING, "H6", HUB_FILE, "hub.repo_url is still the placeholder; set your repository URL"))
+            message = "hub.repo_url is still the placeholder; set your repository URL"
+            findings.append(Finding(WARNING, "H6", HUB_FILE, message))
 
     allow_keys: tuple[str, ...] = ()
     qa = data.get("qa", {})
