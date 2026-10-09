@@ -1,0 +1,13 @@
+# Your hub's identity. Every skill-hub command reads this file.
+# Change name and repo_url first: `skill-hub qa` warns while they are the defaults.
+hub:
+  name: my-skill-hub            # kebab-case: a-z, 0-9 and single hyphens
+  display_name: My Skill Hub
+  owner: Your Team
+  description: Skills for our team's coding agents.
+  repo_url: https://github.com/you/your-hub
+
+qa:
+  # Extra top-level SKILL.md frontmatter keys to accept. Leave empty to keep every
+  # skill installable everywhere; add e.g. when_to_use only if you target Claude Code alone.
+  allow_keys: []
