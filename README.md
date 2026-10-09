@@ -98,10 +98,13 @@ The rules QA enforces:
 | S12 | Symlinks and non-regular files are skipped | warning |
 | S13 | A file or folder in the skill could not be read | error |
 | S14 | `description` is still the placeholder written by `skill-hub new-skill` | warning |
+| S15 | `metadata.version` matches the skill's `version.txt` and its manifest entry, where those exist | error |
 | R1 | `src/` exists and can be read | error |
 | R2 | `src/` holds at least one skill | error |
 | R3 | A loose file sits directly in `src/` | warning |
 | R4 | A symlink sits directly in `src/` | warning |
+| R5 | `release-please-config.json` lists every skill under `packages`, `.release-please-manifest.json` exists, and both are JSON objects (skipped when the config is absent) | error |
+| R6 | No release config or manifest entry names a path under `src/` that is not a skill | error |
 
 ## Contributing
 

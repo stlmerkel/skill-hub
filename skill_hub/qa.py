@@ -1,5 +1,5 @@
 # skill_hub/qa.py
-"""Skill checks (S1-S14), run checks (R1-R4), and the QA runner."""
+"""Skill checks (S1-S15), run checks (R1-R6), and the QA runner."""
 
 import os
 import stat
@@ -21,6 +21,7 @@ from skill_hub.contract import (
 )
 from skill_hub.findings import ERROR, WARNING, Finding
 from skill_hub.frontmatter import FRONTMATTER_LINE_OFFSET, FrontmatterError, split_frontmatter
+from skill_hub.releases import RELEASE_MANIFEST, VERSION_FILE, check_release
 from skill_hub.secrets import scan_text
 from skill_hub.yamlutil import load_yaml
 
@@ -79,12 +80,14 @@ def run_qa(root: Path) -> QaResult:
     if not skills:
         findings.append(Finding(ERROR, "R2", SRC_DIR, "src/ contains no skill directories"))
 
+    release_findings, released = check_release(root, [skill.name for skill in skills])
     for skill_dir in skills:
-        findings.extend(check_skill(skill_dir, allow_keys))
+        findings.extend(check_skill(skill_dir, allow_keys, released.get(skill_dir.name)))
+    findings.extend(release_findings)
     return QaResult(findings, len(skills))
 
 
-def check_skill(skill_dir: Path, allow_keys: tuple[str, ...]) -> list[Finding]:
+def check_skill(skill_dir: Path, allow_keys: tuple[str, ...], released_version: str | None = None) -> list[Finding]:
     rel = f"{SRC_DIR}/{skill_dir.name}"
     try:
         (skill_dir / SKILL_FILE).lstat()
@@ -92,10 +95,12 @@ def check_skill(skill_dir: Path, allow_keys: tuple[str, ...]) -> list[Finding]:
         pass
     except OSError:
         return [Finding(ERROR, "S13", rel, "directory could not be read")]
-    return [*_check_skill_md(skill_dir, rel, allow_keys), *_check_files(skill_dir, rel)]
+    return [*_check_skill_md(skill_dir, rel, allow_keys, released_version), *_check_files(skill_dir, rel)]
 
 
-def _check_skill_md(skill_dir: Path, rel: str, allow_keys: tuple[str, ...]) -> list[Finding]:
+def _check_skill_md(
+    skill_dir: Path, rel: str, allow_keys: tuple[str, ...], released_version: str | None
+) -> list[Finding]:
     path = skill_dir / SKILL_FILE
     md = f"{rel}/{SKILL_FILE}"
 
@@ -130,7 +135,11 @@ def _check_skill_md(skill_dir: Path, rel: str, allow_keys: tuple[str, ...]) -> l
     if not isinstance(loaded.data, dict):
         return [*findings, error("S3", "frontmatter must be a mapping")]
 
-    return [*findings, *_check_fields(loaded.data, loaded.key_lines, skill_dir.name, md, allow_keys)]
+    return [
+        *findings,
+        *_check_fields(loaded.data, loaded.key_lines, skill_dir.name, md, allow_keys),
+        *_check_release_version(loaded.data, skill_dir, md, released_version),
+    ]
 
 
 def _check_fields(fm: dict, key_lines, dir_name: str, md: str, allow_keys: tuple[str, ...]) -> list[Finding]:
@@ -207,6 +216,24 @@ def _check_fields(fm: dict, key_lines, dir_name: str, md: str, allow_keys: tuple
         if key in fm and not isinstance(fm[key], str):
             error("S8", f"{key} must be a string, found {type_name(fm[key])}; quote it")
 
+    return findings
+
+
+def _check_release_version(fm: dict, skill_dir: Path, md: str, released_version: str | None) -> list[Finding]:
+    """S15: metadata.version agrees with version.txt and the release manifest, where those exist."""
+    metadata = fm.get("metadata")
+    version = metadata.get("version") if isinstance(metadata, dict) else None
+    if not isinstance(version, str):
+        return []  # S7 reports it
+    findings = []
+    try:
+        recorded = (skill_dir / VERSION_FILE).read_bytes().decode("utf-8", errors="replace").strip()
+    except OSError:
+        recorded = None  # absent before the first release; S13 reports an unreadable file
+    if recorded is not None and recorded != version:
+        findings.append(Finding(ERROR, "S15", md, f"metadata.version does not match {VERSION_FILE}"))
+    if released_version is not None and released_version != version:
+        findings.append(Finding(ERROR, "S15", md, f"metadata.version does not match {RELEASE_MANIFEST}"))
     return findings
 
 
