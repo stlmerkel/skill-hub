@@ -9,7 +9,7 @@ from skill_hub.qa import SKILL_FILE, SRC_DIR
 
 TEMPLATE = """\
 ---
-name: {name}
+name: "{name}"
 description: "{description}"
 metadata:
   version: "0.1.0" # x-release-please-version

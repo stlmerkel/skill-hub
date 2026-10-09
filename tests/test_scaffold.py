@@ -45,11 +45,21 @@ def test_creates_src_when_missing(tmp_path):
     assert [f.check_id for f in result.warnings] == ["S14"]
 
 
+
+@pytest.mark.parametrize("name", ["true", "no", "null", "on", "2024", "017", "0x1f"])
+def test_names_yaml_would_read_as_non_strings_still_pass_qa(tmp_path, name):
+    write_hub(tmp_path)
+    create_skill(tmp_path, name)
+    result = run_qa(tmp_path)
+    assert result.errors == []
+    assert [f.check_id for f in result.warnings] == ["S14"]
+
+
 # Template
 
 def test_render_fills_name_title_and_placeholder():
     text = render_skill("pdf-tidy")
-    assert text.startswith("---\nname: pdf-tidy\n")
+    assert text.startswith('---\nname: "pdf-tidy"\n')
     assert f'description: "{SCAFFOLD_DESCRIPTION}"\n' in text
     assert '  version: "0.1.0" # x-release-please-version\n' in text
     assert "\n# Pdf Tidy\n" in text
