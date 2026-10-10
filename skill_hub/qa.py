@@ -23,10 +23,9 @@ from skill_hub.findings import ERROR, WARNING, Finding
 from skill_hub.frontmatter import FRONTMATTER_LINE_OFFSET, FrontmatterError, split_frontmatter
 from skill_hub.releases import RELEASE_CONFIG, RELEASE_MANIFEST, VERSION_FILE, check_release
 from skill_hub.secrets import scan_text
+from skill_hub.skills import SKILL_FILE, SKILLS_DIR
 from skill_hub.yamlutil import load_yaml
 
-SKILL_FILE = "SKILL.md"
-SRC_DIR = "src"
 BINARY_WARN_BYTES = 1_000_000
 
 
@@ -48,21 +47,21 @@ def run_qa(root: Path) -> QaResult:
     findings, config = check_hub(root)
     allow_keys = config.allow_keys if config is not None else ()
 
-    src = root / SRC_DIR
-    if not src.exists():
-        return QaResult([*findings, Finding(ERROR, "R1", SRC_DIR, "src/ not found")], 0)
-    if not src.is_dir():
-        return QaResult([*findings, Finding(ERROR, "R1", SRC_DIR, "src is not a directory")], 0)
+    skills_root = root / SKILLS_DIR
+    if not skills_root.exists():
+        return QaResult([*findings, Finding(ERROR, "R1", SKILLS_DIR, "skills/ not found")], 0)
+    if not skills_root.is_dir():
+        return QaResult([*findings, Finding(ERROR, "R1", SKILLS_DIR, "skills is not a directory")], 0)
 
     skills = []
     try:
-        entries = sorted(src.iterdir())
+        entries = sorted(skills_root.iterdir())
     except OSError:
-        return QaResult([*findings, Finding(ERROR, "R1", SRC_DIR, "src/ could not be read")], 0)
+        return QaResult([*findings, Finding(ERROR, "R1", SKILLS_DIR, "skills/ could not be read")], 0)
     for entry in entries:
         if entry.name.startswith("."):
             continue
-        rel = f"{SRC_DIR}/{entry.name}"
+        rel = f"{SKILLS_DIR}/{entry.name}"
         # os.lstat, not Path.is_dir(): on Python 3.14 pathlib returns False on EACCES instead of raising.
         try:
             mode = os.lstat(entry).st_mode
@@ -72,13 +71,14 @@ def run_qa(root: Path) -> QaResult:
             findings.append(Finding(ERROR, "S13", rel, "entry could not be read"))
             continue
         if is_symlink:
-            findings.append(Finding(WARNING, "R4", rel, "symlink in src/ is not followed"))
+            findings.append(Finding(WARNING, "R4", rel, "symlink in skills/ is not followed"))
         elif is_dir:
             skills.append(entry)
         else:
-            findings.append(Finding(WARNING, "R3", rel, "file directly in src/ is not a skill; skills are directories"))
+            message = "file directly in skills/ is not a skill; skills are directories"
+            findings.append(Finding(WARNING, "R3", rel, message))
     if not skills:
-        findings.append(Finding(ERROR, "R2", SRC_DIR, "src/ contains no skill directories"))
+        findings.append(Finding(ERROR, "R2", SKILLS_DIR, "skills/ contains no skill directories"))
 
     release_findings, released, first_release = check_release(root, [skill.name for skill in skills])
     for skill_dir in skills:
@@ -94,7 +94,7 @@ def check_skill(
     released_version: str | None = None,
     first_release_version: str | None = None,
 ) -> list[Finding]:
-    rel = f"{SRC_DIR}/{skill_dir.name}"
+    rel = f"{SKILLS_DIR}/{skill_dir.name}"
     try:
         (skill_dir / SKILL_FILE).lstat()
     except FileNotFoundError:

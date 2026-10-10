@@ -11,8 +11,8 @@ from skill_hub.releases import RELEASE_CONFIG, RELEASE_MANIFEST
 from skill_hub.scaffold import ScaffoldError, create_skill, render_skill
 from tests.conftest import make_skill, skill_md, write_hub
 
-ALREADY = "src/pdf-tidy already exists; choose another name or remove it"
-COULD_NOT_WRITE = "could not write src/pdf-tidy/SKILL.md"
+ALREADY = "skills/pdf-tidy already exists; choose another name or remove it"
+COULD_NOT_WRITE = "could not write skills/pdf-tidy/SKILL.md"
 
 
 def tree(root: Path) -> list[str]:
@@ -33,14 +33,14 @@ def test_scaffolded_skill_passes_qa_with_only_s14(tmp_path):
     write_hub(tmp_path)
     make_skill(tmp_path)
     created = create_skill(tmp_path, "pdf-tidy")
-    assert (created.path, created.registered) == ("src/pdf-tidy/SKILL.md", False)
+    assert (created.path, created.registered) == ("skills/pdf-tidy/SKILL.md", False)
     result = run_qa(tmp_path)
     assert result.errors == []
-    assert [(f.check_id, f.path) for f in result.warnings] == [("S14", "src/pdf-tidy/SKILL.md")]
+    assert [(f.check_id, f.path) for f in result.warnings] == [("S14", "skills/pdf-tidy/SKILL.md")]
     assert result.skill_count == 2
 
 
-def test_creates_src_when_missing(tmp_path):
+def test_creates_skills_when_missing(tmp_path):
     write_hub(tmp_path)
     create_skill(tmp_path, "pdf-tidy")
     result = run_qa(tmp_path)
@@ -76,7 +76,7 @@ def test_single_word_title():
 def test_written_file_has_unix_line_endings(tmp_path):
     write_hub(tmp_path)
     create_skill(tmp_path, "pdf-tidy")
-    data = (tmp_path / "src" / "pdf-tidy" / "SKILL.md").read_bytes()
+    data = (tmp_path / "skills" / "pdf-tidy" / "SKILL.md").read_bytes()
     assert b"\r" not in data
     assert data.decode("utf-8") == render_skill("pdf-tidy")
 
@@ -91,29 +91,29 @@ def test_invalid_name(tmp_path, name):
 
 def test_existing_folder(tmp_path):
     write_hub(tmp_path)
-    (tmp_path / "src" / "pdf-tidy").mkdir(parents=True)
+    (tmp_path / "skills" / "pdf-tidy").mkdir(parents=True)
     refuse(tmp_path, "pdf-tidy", ALREADY)
 
 
 def test_existing_file(tmp_path):
     write_hub(tmp_path)
-    (tmp_path / "src").mkdir()
-    (tmp_path / "src" / "pdf-tidy").write_text("x", encoding="utf-8")
+    (tmp_path / "skills").mkdir()
+    (tmp_path / "skills" / "pdf-tidy").write_text("x", encoding="utf-8")
     refuse(tmp_path, "pdf-tidy", ALREADY)
 
 
 def test_dangling_symlink_at_skill_path(tmp_path):
     write_hub(tmp_path)
-    (tmp_path / "src").mkdir()
-    (tmp_path / "src" / "pdf-tidy").symlink_to(tmp_path / "nowhere")
+    (tmp_path / "skills").mkdir()
+    (tmp_path / "skills" / "pdf-tidy").symlink_to(tmp_path / "nowhere")
     refuse(tmp_path, "pdf-tidy", ALREADY)
 
 
 def test_case_insensitive_collision(tmp_path):
     write_hub(tmp_path)
-    upper = tmp_path / "src" / "Pdf-Tidy"
+    upper = tmp_path / "skills" / "Pdf-Tidy"
     upper.mkdir(parents=True)
-    if not (tmp_path / "src" / "pdf-tidy").exists():
+    if not (tmp_path / "skills" / "pdf-tidy").exists():
         pytest.skip("filesystem is case-sensitive")
     refuse(tmp_path, "pdf-tidy", ALREADY)
 
@@ -136,33 +136,33 @@ def test_no_hub_yml(tmp_path):
     refuse(tmp_path, "pdf-tidy", "hub.yml not found; run this from your hub's root or pass --root")
 
 
-def test_src_is_a_file(tmp_path):
+def test_skills_is_a_file(tmp_path):
     write_hub(tmp_path)
-    (tmp_path / "src").write_text("x", encoding="utf-8")
-    refuse(tmp_path, "pdf-tidy", "src is not a directory")
+    (tmp_path / "skills").write_text("x", encoding="utf-8")
+    refuse(tmp_path, "pdf-tidy", "skills is not a directory")
 
 
-def test_src_is_a_dangling_symlink(tmp_path):
+def test_skills_is_a_dangling_symlink(tmp_path):
     write_hub(tmp_path)
-    (tmp_path / "src").symlink_to(tmp_path / "nowhere")
-    refuse(tmp_path, "pdf-tidy", "src is not a directory")
+    (tmp_path / "skills").symlink_to(tmp_path / "nowhere")
+    refuse(tmp_path, "pdf-tidy", "skills is not a directory")
 
 
 @pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="permissions not enforced")
-def test_unwritable_src(tmp_path):
+def test_unwritable_skills(tmp_path):
     write_hub(tmp_path)
-    src = tmp_path / "src"
-    src.mkdir()
-    src.chmod(0o555)
+    skills = tmp_path / "skills"
+    skills.mkdir()
+    skills.chmod(0o555)
     try:
         refuse(tmp_path, "pdf-tidy", COULD_NOT_WRITE)
     finally:
-        src.chmod(0o755)
+        skills.chmod(0o755)
 
 
 def test_failed_write_removes_the_new_folder(tmp_path, monkeypatch):
     write_hub(tmp_path)
-    (tmp_path / "src").mkdir()
+    (tmp_path / "skills").mkdir()
 
     def fail(*args, **kwargs):
         raise OSError("disk full")
@@ -171,7 +171,7 @@ def test_failed_write_removes_the_new_folder(tmp_path, monkeypatch):
     with pytest.raises(ScaffoldError) as caught:
         create_skill(tmp_path, "pdf-tidy")
     assert str(caught.value) == COULD_NOT_WRITE
-    assert not (tmp_path / "src" / "pdf-tidy").exists()
+    assert not (tmp_path / "skills" / "pdf-tidy").exists()
 
 
 # The shipped config, from the snapshot: the live root copy is the adopter's and changes with their skills.
@@ -190,8 +190,8 @@ def test_registers_new_skill_last_in_packages(tmp_path):
     created = create_skill(tmp_path, "pdf-tidy")
     assert created.registered is True
     config = json.loads((tmp_path / RELEASE_CONFIG).read_text(encoding="utf-8"))
-    assert list(config["packages"]) == ["src/example-skill", "src/pdf-tidy"]
-    assert config["packages"]["src/pdf-tidy"] == {"component": "pdf-tidy", "extra-files": ["SKILL.md"]}
+    assert list(config["packages"]) == ["skills/example-skill", "skills/pdf-tidy"]
+    assert config["packages"]["skills/pdf-tidy"] == {"component": "pdf-tidy", "extra-files": ["SKILL.md"]}
     assert (tmp_path / RELEASE_MANIFEST).read_text(encoding="utf-8") == "{}\n"
 
 
@@ -200,7 +200,7 @@ def test_registration_keeps_kit_formatting(tmp_path):
     create_skill(tmp_path, "pdf-tidy")
     expected = KIT_CONFIG.replace(
         '      ]\n    }\n  }\n}\n',
-        '      ]\n    },\n    "src/pdf-tidy": {\n      "component": "pdf-tidy",\n'
+        '      ]\n    },\n    "skills/pdf-tidy": {\n      "component": "pdf-tidy",\n'
         '      "extra-files": [\n        "SKILL.md"\n      ]\n    }\n  }\n}\n',
     )
     assert (tmp_path / RELEASE_CONFIG).read_text(encoding="utf-8") == expected
@@ -210,7 +210,7 @@ def test_registration_keeps_non_ascii_unescaped(tmp_path):
     release_hub(tmp_path, '{"$comment": "café skills", "packages": {}}\n')
     create_skill(tmp_path, "pdf-tidy")
     text = (tmp_path / RELEASE_CONFIG).read_text(encoding="utf-8")
-    assert '"src/pdf-tidy"' in text
+    assert '"skills/pdf-tidy"' in text
     assert '"$comment": "café skills"' in text
 
 

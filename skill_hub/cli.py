@@ -15,14 +15,16 @@ from skill_hub.site import build_site
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="skill-hub", description="Tools for running a skill hub.")
     commands = parser.add_subparsers(dest="command", required=True)
-    qa = commands.add_parser("qa", help="validate hub.yml and every skill under src/")
-    qa.add_argument("--root", type=Path, default=Path("."), help="hub root containing hub.yml and src/ (default: .)")
+    qa = commands.add_parser("qa", help="validate hub.yml and every skill under skills/")
+    qa.add_argument("--root", type=Path, default=Path("."), help="hub root containing hub.yml and skills/ (default: .)")
     qa.add_argument("--strict", action="store_true", help="treat warnings as errors")
-    new_skill = commands.add_parser("new-skill", help="create a skill under src/ that passes QA")
+    new_skill = commands.add_parser("new-skill", help="create a skill under skills/ that passes QA")
     new_skill.add_argument("name", help="the skill's name: a-z, 0-9 and single hyphens")
     new_skill.add_argument("--root", type=Path, default=Path("."), help="hub root containing hub.yml (default: .)")
-    build = commands.add_parser("build", help="build the marketplace page and catalog.json from hub.yml and src/")
-    build.add_argument("--root", type=Path, default=Path("."), help="hub root containing hub.yml and src/ (default: .)")
+    build = commands.add_parser("build", help="build the marketplace page and catalog.json from hub.yml and skills/")
+    build.add_argument(
+        "--root", type=Path, default=Path("."), help="hub root containing hub.yml and skills/ (default: .)"
+    )
     build.add_argument("--out", type=Path, default=Path("site"), help="output folder (default: site)")
     args = parser.parse_args(argv)
 

@@ -33,7 +33,7 @@ def test_full_shape_and_key_order(tmp_path):
             "license": None,
             "compatibility": None,
             "links": {
-                "source": f"{REPO}/tree/HEAD/src/changelog-formatter",
+                "source": f"{REPO}/tree/HEAD/skills/changelog-formatter",
                 "changelog": None,
                 "release": None,
             },
@@ -62,19 +62,19 @@ def test_changelog_link_only_with_a_changelog_file(tmp_path):
     write_hub(tmp_path)
     make_skill(tmp_path, "with-log")
     make_skill(tmp_path, "without-log")
-    (tmp_path / "src" / "with-log" / "CHANGELOG.md").write_text("# Changelog\n", encoding="utf-8")
-    (tmp_path / "src" / "without-log" / "CHANGELOG.md").mkdir()  # a folder is not a changelog
+    (tmp_path / "skills" / "with-log" / "CHANGELOG.md").write_text("# Changelog\n", encoding="utf-8")
+    (tmp_path / "skills" / "without-log" / "CHANGELOG.md").mkdir()  # a folder is not a changelog
     links = {s["name"]: s["links"]["changelog"] for s in catalog_for(tmp_path)["skills"]}
-    assert links == {"with-log": f"{REPO}/blob/HEAD/src/with-log/CHANGELOG.md", "without-log": None}
+    assert links == {"with-log": f"{REPO}/blob/HEAD/skills/with-log/CHANGELOG.md", "without-log": None}
 
 
 def test_release_link_from_the_manifest(tmp_path):
     write_hub(tmp_path)
     make_skill(tmp_path, "released")
     make_skill(tmp_path, "unreleased")
-    packages = {"src/released": {}, "src/unreleased": {}}
+    packages = {"skills/released": {}, "skills/unreleased": {}}
     (tmp_path / "release-please-config.json").write_text(json.dumps({"packages": packages}), encoding="utf-8")
-    (tmp_path / ".release-please-manifest.json").write_text('{"src/released": "1.0.0"}', encoding="utf-8")
+    (tmp_path / ".release-please-manifest.json").write_text('{"skills/released": "1.0.0"}', encoding="utf-8")
     links = {s["name"]: s["links"]["release"] for s in catalog_for(tmp_path)["skills"]}
     assert links == {"released": f"{REPO}/releases/tag/released-v1.0.0", "unreleased": None}
 
@@ -83,7 +83,7 @@ def test_trailing_slash_on_repo_url_is_dropped(tmp_path):
     write_hub(tmp_path, GOOD_HUB.replace(f"repo_url: {REPO}", f"repo_url: {REPO}/"))
     make_skill(tmp_path)
     catalog = catalog_for(tmp_path)
-    assert catalog["skills"][0]["links"]["source"] == f"{REPO}/tree/HEAD/src/changelog-formatter"
+    assert catalog["skills"][0]["links"]["source"] == f"{REPO}/tree/HEAD/skills/changelog-formatter"
 
 
 def test_bom_and_crlf_skill_builds_clean(tmp_path):

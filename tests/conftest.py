@@ -1,6 +1,8 @@
 # tests/conftest.py
 from pathlib import Path
 
+from skill_hub.skills import SKILLS_DIR
+
 GOOD_HUB = """\
 hub:
   name: acme-skills
@@ -46,7 +48,7 @@ def skill_md(
 
 
 def make_skill(root: Path, dirname: str = "changelog-formatter", text: str | None = None) -> Path:
-    skill_dir = root / "src" / dirname
+    skill_dir = root / SKILLS_DIR / dirname
     skill_dir.mkdir(parents=True, exist_ok=True)
     (skill_dir / "SKILL.md").write_text(skill_md(dirname) if text is None else text, encoding="utf-8")
     return skill_dir

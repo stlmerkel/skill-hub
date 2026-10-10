@@ -21,13 +21,13 @@ def test_good_skill_has_no_findings(tmp_path):
 
 
 def test_s1_missing_skill_md(tmp_path):
-    skill = tmp_path / "src" / "empty"
+    skill = tmp_path / "skills" / "empty"
     skill.mkdir(parents=True)
     assert ids(check_skill(skill, ())) == ["S1"]
 
 
 def test_s1_skill_md_is_directory(tmp_path):
-    skill = tmp_path / "src" / "odd"
+    skill = tmp_path / "skills" / "odd"
     (skill / "SKILL.md").mkdir(parents=True)
     assert ids(check_skill(skill, ())) == ["S1"]
 
@@ -214,8 +214,8 @@ def test_hidden_files_and_dirs_inside_a_skill_are_scanned(tmp_path):
     findings = check_skill(skill, ())
     assert ids(findings) == ["S10", "S10"]
     assert sorted(f.path for f in findings) == [
-        "src/changelog-formatter/.env",
-        "src/changelog-formatter/.secrets/x.txt",
+        "skills/changelog-formatter/.env",
+        "skills/changelog-formatter/.secrets/x.txt",
     ]
     assert all(LIVE not in f.message for f in findings)
 
@@ -279,7 +279,7 @@ def test_s13_unreadable_skill_directory_is_one_finding(tmp_path, mode):
     finally:
         skill.chmod(0o755)
     assert [(f.level, f.check_id, f.path, f.message) for f in findings] == [
-        ("error", "S13", "src/changelog-formatter", "directory could not be read")
+        ("error", "S13", "skills/changelog-formatter", "directory could not be read")
     ]
 
 
@@ -289,7 +289,7 @@ def test_non_regular_file_is_skipped_with_warning(tmp_path):
     os.mkfifo(skill / "pipe")
     findings = check_skill(skill, ())
     assert [(f.level, f.check_id, f.path, f.message) for f in findings] == [
-        ("warning", "S12", "src/changelog-formatter/pipe", "not a regular file; not scanned")
+        ("warning", "S12", "skills/changelog-formatter/pipe", "not a regular file; not scanned")
     ]
 
 
@@ -305,7 +305,7 @@ def test_scaffold_placeholder_description_is_s14_warning(tmp_path):
     make_skill(tmp_path, text=_placeholder_skill(f'"{SCAFFOLD_DESCRIPTION}"'))
     result = run_qa(tmp_path)
     assert result.errors == []
-    assert [(f.check_id, f.path) for f in result.warnings] == [("S14", "src/changelog-formatter/SKILL.md")]
+    assert [(f.check_id, f.path) for f in result.warnings] == [("S14", "skills/changelog-formatter/SKILL.md")]
 
 
 def test_s14_ignores_surrounding_whitespace(tmp_path):

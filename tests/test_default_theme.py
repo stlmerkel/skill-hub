@@ -78,7 +78,7 @@ def test_logo_accent_license_and_links(tmp_path):
     hub = GOOD_HUB + 'site:\n  accent: "#123456"\n  logo_url: "https://cdn.example.test/logo.png"\n'
     write_hub(tmp_path, hub)
     make_skill(tmp_path, text=skill_md(extra_frontmatter='license: "MIT"\n'))
-    (tmp_path / "src" / "changelog-formatter" / "CHANGELOG.md").write_text("# Changelog\n", encoding="utf-8")
+    (tmp_path / "skills" / "changelog-formatter" / "CHANGELOG.md").write_text("# Changelog\n", encoding="utf-8")
     build_site(tmp_path, tmp_path / "out")
     html = (tmp_path / "out" / "index.html").read_text(encoding="utf-8")
     built = Page(html)
@@ -88,8 +88,8 @@ def test_logo_accent_license_and_links(tmp_path):
     assert "License: MIT" in "".join(built.text)
     hrefs = [a["href"] for a in built.all("a")]
     base = "https://github.com/acme/skills"
-    assert f"{base}/tree/HEAD/src/changelog-formatter" in hrefs
-    assert f"{base}/blob/HEAD/src/changelog-formatter/CHANGELOG.md" in hrefs
+    assert f"{base}/tree/HEAD/skills/changelog-formatter" in hrefs
+    assert f"{base}/blob/HEAD/skills/changelog-formatter/CHANGELOG.md" in hrefs
     assert not any("/releases/tag/" in href for href in hrefs)
     assert "None" not in hrefs and "" not in hrefs
 

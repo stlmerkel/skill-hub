@@ -26,7 +26,7 @@ CATALOG = {
             "license": None,
             "compatibility": None,
             "links": {
-                "source": "https://github.com/acme/skills/tree/HEAD/src/alpha",
+                "source": "https://github.com/acme/skills/tree/HEAD/skills/alpha",
                 "changelog": None,
                 "release": None,
             },
@@ -289,7 +289,7 @@ def test_lone_surrogate_is_a_build_error_not_a_traceback(tmp_path):
     root = themed_hub(tmp_path / "hub")
     escape = "\\" + "ud800"  # built by concatenation so no tool turns it into a character (L72)
     text = skill_md().replace('description: "Formats', f'description: "{escape} Formats')
-    (root / "src" / "changelog-formatter" / "SKILL.md").write_text(text, encoding="utf-8")
+    (root / "skills" / "changelog-formatter" / "SKILL.md").write_text(text, encoding="utf-8")
     with pytest.raises(BuildError):
         build_site(root, tmp_path / "out")
     assert not (tmp_path / "out").exists()

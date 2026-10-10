@@ -33,7 +33,7 @@ def test_errors_exit_one_and_report_format(tmp_path, capsys):
     assert main(["qa", "--root", str(tmp_path)]) == 1
     out = capsys.readouterr().out.splitlines()
     assert out[0] == (
-        "ERROR S4 src/foo/SKILL.md: name must be 1-64 characters of a-z, 0-9 and single hyphens, "
+        "ERROR S4 skills/foo/SKILL.md: name must be 1-64 characters of a-z, 0-9 and single hyphens, "
         "with no leading or trailing hyphen"
     )
     assert out[-1] == "QA: 1 error, 0 warnings across 1 skill"
@@ -43,13 +43,13 @@ def test_report_includes_line_numbers(tmp_path, capsys):
     write_hub(tmp_path)
     make_skill(tmp_path, text=skill_md(extra_frontmatter='version: "1.0.0"\n'))
     main(["qa", "--root", str(tmp_path)])
-    assert "src/changelog-formatter/SKILL.md:6:" in capsys.readouterr().out
+    assert "skills/changelog-formatter/SKILL.md:6:" in capsys.readouterr().out
 
 
 def test_missing_everything_is_findings_not_traceback(tmp_path, capsys):
     assert main(["qa", "--root", str(tmp_path)]) == 1
     out = capsys.readouterr().out
-    assert "ERROR H1 hub.yml" in out and "ERROR R1 src" in out
+    assert "ERROR H1 hub.yml" in out and "ERROR R1 skills" in out
 
 
 def test_secret_never_printed(tmp_path):
@@ -77,16 +77,16 @@ def test_one_broken_skill_does_not_hide_another(tmp_path, capsys):
     (other / "tool.py").write_text("def broken(:\n", encoding="utf-8")
     assert main(["qa", "--root", str(tmp_path)]) == 1
     out = capsys.readouterr().out
-    assert "S3 src/aaa-broken/SKILL.md" in out
-    assert "S9 src/zzz-other/tool.py" in out
-    assert "S10 src/zzz-other/SKILL.md" in out
+    assert "S3 skills/aaa-broken/SKILL.md" in out
+    assert "S9 skills/zzz-other/tool.py" in out
+    assert "S10 skills/zzz-other/SKILL.md" in out
 
 
 def test_non_utf8_filename_does_not_crash_output(tmp_path, capsys, monkeypatch):
-    bad = QaResult([Finding(WARNING, "S12", "src/x/bad\udcff.txt", "not a regular file; not scanned")], 1)
+    bad = QaResult([Finding(WARNING, "S12", "skills/x/bad\udcff.txt", "not a regular file; not scanned")], 1)
     monkeypatch.setattr("skill_hub.cli.run_qa", lambda root: bad)
     assert main(["qa", "--root", str(tmp_path)]) == 0
-    assert "src/x/bad\\udcff.txt" in capsys.readouterr().out
+    assert "skills/x/bad\\udcff.txt" in capsys.readouterr().out
 
 
 def test_new_skill_creates_and_reports(tmp_path, capsys):
@@ -94,12 +94,12 @@ def test_new_skill_creates_and_reports(tmp_path, capsys):
     assert main(["new-skill", "pdf-tidy", "--root", str(tmp_path)]) == 0
     out = capsys.readouterr()
     assert out.out.splitlines() == [
-        "Created src/pdf-tidy/SKILL.md",
+        "Created skills/pdf-tidy/SKILL.md",
         "Release registration skipped: no release-please-config.json",
         "Next: replace the placeholder description and instructions, then run `uv run skill-hub qa`.",
     ]
     assert out.err == ""
-    assert (tmp_path / "src" / "pdf-tidy" / "SKILL.md").is_file()
+    assert (tmp_path / "skills" / "pdf-tidy" / "SKILL.md").is_file()
 
 
 def test_new_skill_refusal_exits_one_on_stderr(tmp_path, capsys):
@@ -129,14 +129,14 @@ def test_new_skill_listed_in_help():
 
 def test_new_skill_failure_has_no_traceback(tmp_path):
     (tmp_path / "hub.yml").write_text("x", encoding="utf-8")
-    (tmp_path / "src").write_text("x", encoding="utf-8")
+    (tmp_path / "skills").write_text("x", encoding="utf-8")
     result = subprocess.run(
         [sys.executable, "-m", "skill_hub.cli", "new-skill", "pdf-tidy", "--root", str(tmp_path)],
         capture_output=True,
         text=True,
     )
     assert result.returncode == 1
-    assert result.stderr == "error: src is not a directory\n"
+    assert result.stderr == "error: skills is not a directory\n"
 
 
 def test_new_skill_registered_has_no_skip_line(tmp_path, capsys):
@@ -145,11 +145,11 @@ def test_new_skill_registered_has_no_skip_line(tmp_path, capsys):
     (tmp_path / ".release-please-manifest.json").write_text("{}", encoding="utf-8")
     assert main(["new-skill", "pdf-tidy", "--root", str(tmp_path)]) == 0
     assert capsys.readouterr().out.splitlines() == [
-        "Created src/pdf-tidy/SKILL.md",
+        "Created skills/pdf-tidy/SKILL.md",
         "Next: replace the placeholder description and instructions, then run `uv run skill-hub qa`.",
     ]
     config = json.loads((tmp_path / "release-please-config.json").read_text(encoding="utf-8"))
-    assert "src/pdf-tidy" in config["packages"]
+    assert "skills/pdf-tidy" in config["packages"]
 
 
 FIXTURE = Path(__file__).parent / "fixtures" / "default-clone"

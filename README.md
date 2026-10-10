@@ -10,7 +10,7 @@ skill-hub is not a marketplace itself. It is the scaffolding for yours: everythi
 
 | Piece | What it does | Status |
 |---|---|---|
-| **Skill contract** | Each skill is a folder under `src/` with a `SKILL.md` that follows the [Agent Skills specification](https://agentskills.io/specification), so it installs in any client that reads the spec | Available |
+| **Skill contract** | Each skill is a folder under `skills/` with a `SKILL.md` that follows the [Agent Skills specification](https://agentskills.io/specification), so it installs in any client that reads the spec | Available |
 | **QA guard** | `skill-hub qa` checks your hub config and every skill: valid frontmatter, a name that matches its folder, a SemVer version, Python that compiles, and no committed secrets. It runs locally and on every pull request | Available |
 | **Semantic releases** | Conventional commits (`feat:`, `fix:`) drive version bumps and changelogs through [Release Please](https://github.com/googleapis/release-please), one version per skill | Available |
 | **Marketplace page** | `skill-hub build` turns your skills into a static, self-contained page and a `catalog.json`, restyled from `hub.yml` or replaced by your own theme. Host it anywhere | Available |
@@ -31,15 +31,15 @@ uv run skill-hub qa
 A fresh clone passes with two warnings. They are reminders to make the hub yours:
 
 1. **Edit `hub.yml`.** Set `hub.name` (lowercase letters, digits and single hyphens), `display_name`, `owner`, `description` and `repo_url`. Every skill-hub command reads identity from this file and nowhere else.
-2. **Replace the example skill.** `src/example-skill/` shows the shape of a skill. Create your own with `uv run skill-hub new-skill <name>`, then delete the example once you have real skills. QA warns (S14) until you replace the new skill's placeholder description.
+2. **Replace the example skill.** `skills/example-skill/` shows the shape of a skill. Create your own with `uv run skill-hub new-skill <name>`, then delete the example once you have real skills. QA warns (S14) until you replace the new skill's placeholder description.
 3. **Run `uv run skill-hub qa` again.** With no warnings left, your hub is ready for skills.
 
 ## Layout
 
 ```text
 hub.yml                    your hub's identity and QA options (yours to edit)
-src/<skill>/SKILL.md       your skills, one folder each (yours)
-src/<skill>/...            optional scripts/, references/, assets/
+skills/<skill>/SKILL.md    your skills, one folder each (yours)
+skills/<skill>/...         optional scripts/, references/, assets/
 skill_hub/                 the QA tool (part of the kit)
 skill_hub/themes/default/  the built-in marketplace theme (copy it to make your own)
 site/                      build output from skill-hub build (git-ignored)
@@ -50,7 +50,7 @@ release-please-config.json     which skills Release Please versions (skill-hub n
 .release-please-manifest.json  each skill's last released version (Release Please maintains it)
 ```
 
-You own `hub.yml`, `src/` and the two release files, which list your skills. Everything else belongs to the kit, which keeps pulling in kit updates simple. New config keys are always optional with a default, so your `hub.yml` keeps working.
+You own `hub.yml`, `skills/` and the two release files, which list your skills. Everything else belongs to the kit, which keeps pulling in kit updates simple. New config keys are always optional with a default, so your `hub.yml` keeps working.
 
 ## Writing a skill
 
@@ -119,7 +119,7 @@ The default page is one file with its styles inlined and no outside requests, so
   "skills": [{
     "name": "...", "description": "...", "version": "1.2.0",
     "license": null, "compatibility": null,
-    "links": {"source": "<repo_url>/tree/HEAD/src/<name>", "changelog": null, "release": null}
+    "links": {"source": "<repo_url>/tree/HEAD/skills/<name>", "changelog": null, "release": null}
   }]
 }
 ```
@@ -168,12 +168,12 @@ A theme is a folder with an `index.html.j2` [Jinja2](https://jinja.palletsprojec
 | S14 | `description` is still the placeholder written by `skill-hub new-skill` | warning |
 | S15 | `metadata.version` matches the skill's manifest entry, and its `version.txt` if it has one | error |
 | S16 | A registered skill that has never been released has a `metadata.version` other than its first-release version (`initial-version`), which the first release would overwrite | warning |
-| R1 | `src/` exists and can be read | error |
-| R2 | `src/` holds at least one skill | error |
-| R3 | A loose file sits directly in `src/` | warning |
-| R4 | A symlink sits directly in `src/` | warning |
+| R1 | `skills/` exists and can be read | error |
+| R2 | `skills/` holds at least one skill | error |
+| R3 | A loose file sits directly in `skills/` | warning |
+| R4 | A symlink sits directly in `skills/` | warning |
 | R5 | `release-please-config.json` lists every skill under `packages`, `.release-please-manifest.json` exists, and both are JSON objects (skipped when the config is absent) | error |
-| R6 | No release config or manifest entry names a path under `src/` that is not a skill | error |
+| R6 | No release config or manifest entry names a path under `skills/` that is not a skill | error |
 
 ## Contributing
 
