@@ -1,5 +1,5 @@
 # skill_hub/qa.py
-"""Skill checks (S1-S16), run checks (R1-R6), and the QA runner."""
+"""Skill checks (S1-S17), run checks (R1-R6), and the QA runner."""
 
 import os
 import stat
@@ -15,6 +15,7 @@ from skill_hub.contract import (
     SCAFFOLD_DESCRIPTION,
     SPEC_KEYS,
     is_blank,
+    is_reserved_plugin_name,
     is_valid_name,
     is_valid_semver,
     type_name,
@@ -165,6 +166,9 @@ def _check_fields(fm: dict, key_lines, dir_name: str, md: str, allow_keys: tuple
         error("S4", NAME_RULE)
     elif name != dir_name:
         error("S4", f'name does not match directory "{dir_name}"')
+    if isinstance(name, str) and is_valid_name(name) and is_reserved_plugin_name(name):
+        message = "name passes for one of Anthropic's own plugins; Claude Code refuses it as a plugin name"
+        findings.append(Finding(WARNING, "S17", md, message))
 
     # S5 description
     description = fm.get("description")

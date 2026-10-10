@@ -324,3 +324,8 @@ def test_description_mentioning_todo_has_no_s14(tmp_path):
     write_hub(tmp_path)
     make_skill(tmp_path, text=_placeholder_skill('"TODO list manager. Use when the user asks to track tasks."'))
     assert "S14" not in ids(run_qa(tmp_path).findings)
+
+
+def test_s17_reserved_plugin_name_is_a_warning(tmp_path):
+    findings = run(tmp_path, skill_md("claude-helper"), dirname="claude-helper")
+    assert ids(findings) == ["S17"] and findings[0].level == "warning"

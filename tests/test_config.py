@@ -213,3 +213,10 @@ def test_h10_theme_cannot_be_the_hub_root(tmp_path):
     (tmp_path / "index.html.j2").write_text("x", encoding="utf-8")
     write_hub(tmp_path, site_hub('  theme: "."\n'))
     assert ids(check_hub(tmp_path)[0]) == ["H10"]
+
+
+def test_h11_reserved_hub_name_without_echo(tmp_path):
+    write_hub(tmp_path, GOOD_HUB.replace("name: acme-skills", "name: agent-skills"))
+    findings, config = check_hub(tmp_path)
+    assert ids(findings) == ["H11"] and config is None
+    assert "agent-skills" not in findings[0].message

@@ -2,7 +2,17 @@ import datetime
 
 import pytest
 
-from skill_hub.contract import is_blank, is_hex_colour, is_safe_logo_url, is_valid_name, is_valid_semver, type_name
+from skill_hub.contract import (
+    github_repo,
+    is_blank,
+    is_hex_colour,
+    is_reserved_marketplace_name,
+    is_reserved_plugin_name,
+    is_safe_logo_url,
+    is_valid_name,
+    is_valid_semver,
+    type_name,
+)
 
 
 @pytest.mark.parametrize("name", ["a", "example-skill", "sql2-optimizer", "a" * 64, "0-9"])
@@ -89,3 +99,73 @@ def test_logo_url_accepts(value):
 )
 def test_logo_url_rejects(value):
     assert not is_safe_logo_url(value)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "agent-skills",
+        "claude-plugins-official",
+        "healthcare",
+        "anthropic-plugin-directory",
+        "inline",
+        "skills-dir",
+        "npm",
+        "github",
+        "gh",
+        "constructor",
+        "claudeai-team",
+    ],
+)
+def test_reserved_marketplace_names(name):
+    assert is_reserved_marketplace_name(name)
+
+
+@pytest.mark.parametrize("name", ["my-skill-hub", "acme-skills", "github-tools", "claudeai", "skills"])
+def test_unreserved_marketplace_names(name):
+    assert not is_reserved_marketplace_name(name)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "claude",
+        "anthropic",
+        "anthropics",
+        "claude-code",
+        "claude-mods",
+        "claude-helper",
+        "anthropic-tools",
+        "anthropics-tools",
+        "cc-plugin-lint",
+        "official-claude-tools",
+        "tools-anthropic-official",
+    ],
+)
+def test_reserved_plugin_names(name):
+    assert is_reserved_plugin_name(name)
+
+
+@pytest.mark.parametrize("name", ["commit-message", "mcp-for-claude", "claudette", "official-tools", "cc-plugins"])
+def test_unreserved_plugin_names(name):
+    assert not is_reserved_plugin_name(name)
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("https://github.com/acme/skills", "acme/skills"),
+        ("https://github.com/acme/skills.git", "acme/skills"),
+        ("https://github.com/acme/skills/", "acme/skills"),
+        ("https://github.com/acme/skills.git/", "acme/skills"),
+        ("https://github.com/acme/my.hub", "acme/my.hub"),
+        ("http://github.com/acme/skills", None),
+        ("https://gitlab.com/acme/skills", None),
+        ("https://github.com/acme", None),
+        ("https://github.com/acme/skills/tree/main", None),
+        ("https://github.com/acme/..", None),
+        ("", None),
+    ],
+)
+def test_github_repo(url, expected):
+    assert github_repo(url) == expected

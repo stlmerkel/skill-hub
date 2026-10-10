@@ -78,3 +78,49 @@ def is_safe_logo_url(value: str) -> bool:
     if value.startswith(_HTTPS):
         return len(value) > len(_HTTPS)
     return not value.startswith("//") and _URL_SCHEME_RE.match(value) is None
+
+
+# Marketplace names Claude Code refuses, from code.claude.com/docs/en/plugins/marketplace-reference#reserved-names
+# (checked 2026-10-10). Compared lowercased; hub.name is already lowercase kebab-case (H4).
+RESERVED_MARKETPLACE_NAMES = frozenset({
+    "claude-code-marketplace", "claude-code-plugins", "claude-plugins-official", "anthropic-marketplace",
+    "anthropic-plugins", "agent-skills", "anthropic-agent-skills", "life-sciences", "knowledge-work-plugins",
+    "claude-for-legal", "claude-for-financial-services", "financial-services-plugins", "first-party-plugins",
+    "claude-tag-plugins", "claude-community", "claude-plugins-community", "healthcare",
+    "anthropic-plugin-directory", "claude-plugin-directory", "inline", "builtin", "skills-dir", "synced",
+    "claude-plugin-test", "npm", "pip", "uv", "cargo", "github", "gh", "constructor", "hasownproperty",
+    "isprototypeof", "propertyisenumerable", "tolocalestring", "tostring", "valueof",
+})
+RESERVED_MARKETPLACE_PREFIX = "claudeai-"
+
+# Plugin names Claude Code refuses as passing for Anthropic's own, from
+# code.claude.com/docs/en/plugins/manifest-reference#name (checked 2026-10-10).
+_RESERVED_PLUGIN_NAMES = frozenset({"claude", "anthropic", "anthropics", "claude-code", "claude-mods"})
+_RESERVED_PLUGIN_PREFIXES = ("claude-", "anthropic-", "anthropics-", "cc-plugin-")
+_OFFICIAL_NEIGHBOURS = frozenset({"claude", "anthropic"})
+
+_GITHUB_REPO_RE = re.compile(r"https://github\.com/([A-Za-z0-9-]+)/([A-Za-z0-9._-]+?)(?:\.git)?/?", re.ASCII)
+
+
+def is_reserved_marketplace_name(value: str) -> bool:
+    lowered = value.lower()
+    return lowered in RESERVED_MARKETPLACE_NAMES or lowered.startswith(RESERVED_MARKETPLACE_PREFIX)
+
+
+def is_reserved_plugin_name(value: str) -> bool:
+    lowered = value.lower()
+    if lowered in _RESERVED_PLUGIN_NAMES or lowered.startswith(_RESERVED_PLUGIN_PREFIXES):
+        return True
+    words = lowered.split("-")
+    return any(
+        "official" in pair and pair & _OFFICIAL_NEIGHBOURS
+        for pair in (set(words[i : i + 2]) for i in range(len(words) - 1))
+    )
+
+
+def github_repo(repo_url: str) -> str | None:
+    """`owner/repo` for an exact https://github.com/<owner>/<repo> URL (trailing .git or / allowed), else None."""
+    match = _GITHUB_REPO_RE.fullmatch(repo_url)
+    if match is None or match[2] in {".", ".."}:
+        return None
+    return f"{match[1]}/{match[2]}"

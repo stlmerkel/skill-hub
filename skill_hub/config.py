@@ -1,4 +1,4 @@
-"""Load and check hub.yml (checks H1-H10)."""
+"""Load and check hub.yml (checks H1-H11)."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,6 +8,7 @@ from skill_hub.contract import (
     DEFAULT_REPO_URL,
     is_blank,
     is_hex_colour,
+    is_reserved_marketplace_name,
     is_safe_logo_url,
     is_valid_name,
     type_name,
@@ -133,6 +134,8 @@ def check_hub(root: Path) -> tuple[list[Finding], HubConfig | None]:
                 "H4",
                 "hub.name must be 1-64 characters of a-z, 0-9 and single hyphens, with no leading or trailing hyphen",
             ))
+        if isinstance(name, str) and is_valid_name(name) and is_reserved_marketplace_name(name):
+            findings.append(_error("H11", "hub.name is a marketplace name Claude Code reserves; choose another"))
         if name == DEFAULT_HUB_NAME:
             message = f"hub.name is still the default {DEFAULT_HUB_NAME!r}; set your hub's name"
             findings.append(Finding(WARNING, "H6", HUB_FILE, message))

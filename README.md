@@ -152,6 +152,7 @@ A theme is a folder with an `index.html.j2` [Jinja2](https://jinja.palletsprojec
 | H8 | `site.accent` is a hex colour such as `"#4f46e5"` | error |
 | H9 | `site.logo_url` is an `https://` URL or a relative path | error |
 | H10 | `site.theme` is a folder inside the hub root that contains `index.html.j2` | error |
+| H11 | `hub.name` is not a marketplace name Claude Code reserves (such as `agent-skills`, `github` or anything starting `claudeai-`) | error |
 | S1 | The skill has a `SKILL.md` | error |
 | S2 | `SKILL.md` is UTF-8 and opens with a `---` frontmatter block | error |
 | S3 | The frontmatter is valid YAML and a mapping | error |
@@ -168,6 +169,7 @@ A theme is a folder with an `index.html.j2` [Jinja2](https://jinja.palletsprojec
 | S14 | `description` is still the placeholder written by `skill-hub new-skill` | warning |
 | S15 | `metadata.version` matches the skill's manifest entry, and its `version.txt` if it has one | error |
 | S16 | A registered skill that has never been released has a `metadata.version` other than its first-release version (`initial-version`), which the first release would overwrite | warning |
+| S17 | The skill's name doesn't pass for one of Anthropic's own plugins (such as a `claude-` or `anthropic-` prefix), which Claude Code refuses | warning |
 | R1 | `skills/` exists and can be read | error |
 | R2 | `skills/` holds at least one skill | error |
 | R3 | A loose file sits directly in `skills/` | warning |
