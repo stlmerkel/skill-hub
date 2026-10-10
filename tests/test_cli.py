@@ -6,7 +6,8 @@ from pathlib import Path
 
 from skill_hub.cli import main
 from skill_hub.findings import WARNING, Finding
-from skill_hub.qa import QaResult
+from skill_hub.manifests import MANIFEST_PATHS, ManifestError
+from skill_hub.qa import QaResult, run_qa
 from tests.conftest import GOOD_HUB, make_skill, skill_md, sync_manifests, write_hub
 
 SECRET = "AKIA" + "Q" * 16
@@ -99,6 +100,7 @@ def test_new_skill_creates_and_reports(tmp_path, capsys):
         "Created skills/pdf-tidy/SKILL.md",
         "Release registration skipped: no release-please-config.json",
         "Next: replace the placeholder description and instructions, then run `uv run skill-hub qa`.",
+        "Updated the marketplace manifests",
     ]
     assert out.err == ""
     assert (tmp_path / "skills" / "pdf-tidy" / "SKILL.md").is_file()
@@ -150,6 +152,7 @@ def test_new_skill_registered_has_no_skip_line(tmp_path, capsys):
     assert capsys.readouterr().out.splitlines() == [
         "Created skills/pdf-tidy/SKILL.md",
         "Next: replace the placeholder description and instructions, then run `uv run skill-hub qa`.",
+        "Updated the marketplace manifests",
     ]
     config = json.loads((tmp_path / "release-please-config.json").read_text(encoding="utf-8"))
     assert "skills/pdf-tidy" in config["packages"]
@@ -184,3 +187,55 @@ def test_build_prints_theme_warnings(tmp_path, capsys):
     sync_manifests(tmp_path)
     assert main(["build", "--root", str(tmp_path), "--out", str(tmp_path / "out")]) == 0
     assert capsys.readouterr().out.splitlines()[0] == "warning: theme/linked.css: symlink in theme is not followed"
+
+
+def test_manifests_command_writes_both_and_qa_passes(tmp_path, capsys):
+    write_hub(tmp_path)
+    make_skill(tmp_path)
+    assert main(["manifests", "--root", str(tmp_path)]) == 0
+    assert capsys.readouterr().out.strip() == (
+        "Wrote .claude-plugin/marketplace.json and .cursor-plugin/marketplace.json for 1 skill"
+    )
+    assert all((tmp_path / rel).is_file() for rel in MANIFEST_PATHS)
+    assert run_qa(tmp_path).errors == []
+
+
+def test_manifests_command_refuses_on_other_qa_errors(tmp_path, capsys):
+    write_hub(tmp_path)
+    make_skill(tmp_path, "foo", skill_md("Foo"))
+    assert main(["manifests", "--root", str(tmp_path)]) == 1
+    captured = capsys.readouterr()
+    assert captured.err.startswith("error: QA found 1 error") and captured.out == ""
+    assert not (tmp_path / MANIFEST_PATHS[0]).exists()
+
+
+def test_manifests_command_reports_a_write_failure(tmp_path, capsys, monkeypatch):
+    write_hub(tmp_path)
+    make_skill(tmp_path)
+
+    def broken(root, rendered):
+        raise ManifestError("could not write .claude-plugin/marketplace.json")
+
+    monkeypatch.setattr("skill_hub.cli.write_manifests", broken)
+    assert main(["manifests", "--root", str(tmp_path)]) == 1
+    assert capsys.readouterr().err.strip() == "error: could not write .claude-plugin/marketplace.json"
+
+
+def test_new_skill_refreshes_manifests(tmp_path, capsys):
+    write_hub(tmp_path)
+    make_skill(tmp_path)
+    sync_manifests(tmp_path)
+    assert main(["new-skill", "pdf-tidy", "--root", str(tmp_path)]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == "Updated the marketplace manifests"
+    assert '"pdf-tidy"' in (tmp_path / MANIFEST_PATHS[0]).read_text(encoding="utf-8")
+    assert run_qa(tmp_path).errors == []
+
+
+def test_new_skill_with_other_qa_errors_creates_and_hints(tmp_path, capsys):
+    write_hub(tmp_path)
+    make_skill(tmp_path, "foo", skill_md("Foo"))
+    assert main(["new-skill", "pdf-tidy", "--root", str(tmp_path)]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[-1] == "Manifests not updated: fix the QA errors, then run `skill-hub manifests`"
+    assert (tmp_path / "skills" / "pdf-tidy" / "SKILL.md").is_file()
+    assert not (tmp_path / MANIFEST_PATHS[0]).exists()
