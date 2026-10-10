@@ -1,5 +1,5 @@
 # skill_hub/qa.py
-"""Skill checks (S1-S17), run checks (R1-R6), and the QA runner."""
+"""Skill checks (S1-S17), run checks (R1-R7), and the QA runner."""
 
 import os
 import stat
@@ -22,6 +22,7 @@ from skill_hub.contract import (
 )
 from skill_hub.findings import ERROR, WARNING, Finding
 from skill_hub.frontmatter import FRONTMATTER_LINE_OFFSET, FrontmatterError, split_frontmatter
+from skill_hub.manifests import check_manifests
 from skill_hub.releases import RELEASE_CONFIG, RELEASE_MANIFEST, VERSION_FILE, check_release
 from skill_hub.secrets import scan_text
 from skill_hub.skills import SKILL_FILE, SKILLS_DIR
@@ -86,6 +87,8 @@ def run_qa(root: Path) -> QaResult:
         name = skill_dir.name
         findings.extend(check_skill(skill_dir, allow_keys, released.get(name), first_release.get(name)))
     findings.extend(release_findings)
+    if config is not None and skills and not any(f.level == ERROR for f in findings):
+        findings.extend(check_manifests(root, config))
     return QaResult(findings, len(skills))
 
 

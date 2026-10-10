@@ -7,7 +7,7 @@ from pathlib import Path
 from skill_hub.cli import main
 from skill_hub.findings import WARNING, Finding
 from skill_hub.qa import QaResult
-from tests.conftest import GOOD_HUB, make_skill, skill_md, write_hub
+from tests.conftest import GOOD_HUB, make_skill, skill_md, sync_manifests, write_hub
 
 SECRET = "AKIA" + "Q" * 16
 LOWER = "sk" + "-" + "a1" * 12  # lowercase, so it is a valid skill name
@@ -16,6 +16,7 @@ LOWER = "sk" + "-" + "a1" * 12  # lowercase, so it is a valid skill name
 def test_clean_exit_zero(tmp_path, capsys):
     write_hub(tmp_path)
     make_skill(tmp_path)
+    sync_manifests(tmp_path)
     assert main(["qa", "--root", str(tmp_path)]) == 0
     assert capsys.readouterr().out.strip() == "QA: 0 errors, 0 warnings across 1 skill"
 
@@ -23,6 +24,7 @@ def test_clean_exit_zero(tmp_path, capsys):
 def test_warnings_only_exit_zero_unless_strict(tmp_path, capsys):
     write_hub(tmp_path, GOOD_HUB.replace("name: acme-skills", "name: my-skill-hub"))
     make_skill(tmp_path)
+    sync_manifests(tmp_path)
     assert main(["qa", "--root", str(tmp_path)]) == 0
     assert main(["qa", "--root", str(tmp_path), "--strict"]) == 1
 
@@ -116,6 +118,7 @@ def test_new_skill_refusal_exits_one_on_stderr(tmp_path, capsys):
 def test_new_skill_then_qa_passes(tmp_path, capsys):
     write_hub(tmp_path)
     main(["new-skill", "pdf-tidy", "--root", str(tmp_path)])
+    sync_manifests(tmp_path)
     assert main(["qa", "--root", str(tmp_path)]) == 0
     assert main(["qa", "--root", str(tmp_path), "--strict"]) == 1
 
@@ -178,5 +181,6 @@ def test_build_prints_theme_warnings(tmp_path, capsys):
     (theme / "index.html.j2").write_text("x", encoding="utf-8")
     (tmp_path / "real.css").write_text("x", encoding="utf-8")
     os.symlink(tmp_path / "real.css", theme / "linked.css")
+    sync_manifests(tmp_path)
     assert main(["build", "--root", str(tmp_path), "--out", str(tmp_path / "out")]) == 0
     assert capsys.readouterr().out.splitlines()[0] == "warning: theme/linked.css: symlink in theme is not followed"

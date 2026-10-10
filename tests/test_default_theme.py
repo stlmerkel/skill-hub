@@ -2,7 +2,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 from skill_hub.site import build_site
-from tests.conftest import GOOD_HUB, make_skill, skill_md, write_hub
+from tests.conftest import GOOD_HUB, make_skill, skill_md, sync_manifests, write_hub
 
 SNAPSHOT = Path(__file__).parent / "fixtures" / "default-clone"
 HOSTILE = "<script>alert(\"x\")</script> 'q' & </article><b>"
@@ -65,6 +65,7 @@ def test_hostile_text_is_escaped_everywhere(tmp_path):
         f'description: "{description}"',
     )
     make_skill(tmp_path, text=text)
+    sync_manifests(tmp_path)
     build_site(tmp_path, tmp_path / "out")
     built = page(tmp_path / "out")
     assert len(built.all("script")) == 1
@@ -79,6 +80,7 @@ def test_logo_accent_license_and_links(tmp_path):
     write_hub(tmp_path, hub)
     make_skill(tmp_path, text=skill_md(extra_frontmatter='license: "MIT"\n'))
     (tmp_path / "skills" / "changelog-formatter" / "CHANGELOG.md").write_text("# Changelog\n", encoding="utf-8")
+    sync_manifests(tmp_path)
     build_site(tmp_path, tmp_path / "out")
     html = (tmp_path / "out" / "index.html").read_text(encoding="utf-8")
     built = Page(html)

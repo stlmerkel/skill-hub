@@ -7,7 +7,7 @@ import pytest
 
 from skill_hub.contract import SCAFFOLD_DESCRIPTION
 from skill_hub.qa import check_skill, run_qa
-from tests.conftest import ids, make_skill, skill_md, write_hub
+from tests.conftest import ids, make_skill, skill_md, sync_manifests, write_hub
 
 LIVE = "s3cr3t" + "Value99"
 
@@ -303,6 +303,7 @@ def _placeholder_skill(description_yaml: str) -> str:
 def test_scaffold_placeholder_description_is_s14_warning(tmp_path):
     write_hub(tmp_path)
     make_skill(tmp_path, text=_placeholder_skill(f'"{SCAFFOLD_DESCRIPTION}"'))
+    sync_manifests(tmp_path)
     result = run_qa(tmp_path)
     assert result.errors == []
     assert [(f.check_id, f.path) for f in result.warnings] == [("S14", "skills/changelog-formatter/SKILL.md")]

@@ -1,0 +1,14 @@
+{
+  "name": "my-skill-hub",
+  "owner": {
+    "name": "Your Team"
+  },
+  "description": "Skills for our team's coding agents.",
+  "plugins": [
+    {
+      "name": "example-skill",
+      "source": "./skills/example-skill",
+      "description": "Example skill: replace or delete. Writes a Conventional Commits message for the currently staged changes. Use when the user asks for a commit message, says 'commit this', or wants staged work summarised before committing, even if they never mention Conventional Commits."
+    }
+  ]
+}

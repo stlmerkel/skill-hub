@@ -176,6 +176,7 @@ A theme is a folder with an `index.html.j2` [Jinja2](https://jinja.palletsprojec
 | R4 | A symlink sits directly in `skills/` | warning |
 | R5 | `release-please-config.json` lists every skill under `packages`, `.release-please-manifest.json` exists, and both are JSON objects (skipped when the config is absent) | error |
 | R6 | No release config or manifest entry names a path under `skills/` that is not a skill | error |
+| R7 | `.claude-plugin/marketplace.json` and `.cursor-plugin/marketplace.json` exist and match what `skill-hub manifests` would write (checked only when nothing else failed) | error |
 
 ## Contributing
 

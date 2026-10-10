@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from skill_hub.qa import run_qa
-from tests.conftest import ids, make_skill, skill_md, write_hub
+from tests.conftest import ids, make_skill, skill_md, sync_manifests, write_hub
 
 SECRET = "AKIA" + "Q" * 16
 
@@ -30,12 +30,14 @@ def pairs(findings) -> list[tuple[str, str]]:
 
 def test_no_release_config_means_no_release_checks(tmp_path):
     hub_with_skill(tmp_path)
+    sync_manifests(tmp_path)
     assert run_qa(tmp_path).findings == []
 
 
 def test_registered_unreleased_skill_is_clean(tmp_path):
     hub_with_skill(tmp_path)
     write_release(tmp_path, entry("changelog-formatter"))
+    sync_manifests(tmp_path)
     assert run_qa(tmp_path).findings == []
 
 
@@ -45,12 +47,14 @@ def test_released_skill_as_release_please_leaves_it_is_clean(tmp_path):
     (skill / "version.txt").write_text("1.0.0\n", encoding="utf-8")
     changelog = "# Changelog\n\n## 1.0.0 (2026-10-09)\n\n### Features\n\n* first\n"
     (skill / "CHANGELOG.md").write_text(changelog, encoding="utf-8")
+    sync_manifests(tmp_path)
     assert run_qa(tmp_path).findings == []
 
 
 def test_non_skill_package_keys_are_ignored(tmp_path):
     hub_with_skill(tmp_path)
     write_release(tmp_path, {**entry("changelog-formatter"), ".": {"component": "kit"}}, {".": "0.1.0"})
+    sync_manifests(tmp_path)
     assert run_qa(tmp_path).findings == []
 
 
@@ -162,6 +166,7 @@ def write_config(root: Path, config: dict) -> None:
 def test_unreleased_skill_above_initial_version_is_s16_warning(tmp_path):
     hub_with_skill(tmp_path)  # metadata.version "1.0.0"
     write_config(tmp_path, {"initial-version": "0.1.0", "packages": entry("changelog-formatter")})
+    sync_manifests(tmp_path)
     result = run_qa(tmp_path)
     assert result.errors == []
     assert pairs(result.warnings) == [("S16", "skills/changelog-formatter/SKILL.md")]
@@ -170,6 +175,7 @@ def test_unreleased_skill_above_initial_version_is_s16_warning(tmp_path):
 def test_default_initial_version_is_1_0_0(tmp_path):
     hub_with_skill(tmp_path)
     write_config(tmp_path, {"packages": entry("changelog-formatter")})
+    sync_manifests(tmp_path)
     assert run_qa(tmp_path).findings == []
 
 
@@ -177,6 +183,7 @@ def test_package_initial_version_overrides_top_level(tmp_path):
     hub_with_skill(tmp_path)
     package = {"skills/changelog-formatter": {"component": "changelog-formatter", "initial-version": "1.0.0"}}
     write_config(tmp_path, {"initial-version": "0.1.0", "packages": package})
+    sync_manifests(tmp_path)
     assert run_qa(tmp_path).findings == []
 
 
@@ -184,6 +191,7 @@ def test_released_skill_has_no_s16(tmp_path):
     hub_with_skill(tmp_path)
     write_config(tmp_path, {"initial-version": "0.1.0", "packages": entry("changelog-formatter")})
     (tmp_path / ".release-please-manifest.json").write_text('{"skills/changelog-formatter": "1.0.0"}', encoding="utf-8")
+    sync_manifests(tmp_path)
     assert run_qa(tmp_path).findings == []
 
 

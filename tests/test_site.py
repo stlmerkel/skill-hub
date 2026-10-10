@@ -7,7 +7,7 @@ import pytest
 from skill_hub.catalog import BuildError
 from skill_hub.config import SiteSettings
 from skill_hub.site import MARKER_FILE, build_site, render_theme, write_site
-from tests.conftest import GOOD_HUB, make_skill, make_theme, skill_md, write_hub
+from tests.conftest import GOOD_HUB, make_skill, make_theme, skill_md, sync_manifests, write_hub
 
 CATALOG = {
     "schema_version": 1,
@@ -166,6 +166,7 @@ def themed_hub(root, theme="theme"):
     make_theme(root, theme, index="{% for s in catalog.skills %}<p>{{ s.name }}</p>{% endfor %}\n")
     write_hub(root, GOOD_HUB + f'site:\n  theme: "{theme}"\n')
     make_skill(root)
+    sync_manifests(root)
     return root
 
 

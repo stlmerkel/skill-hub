@@ -9,7 +9,7 @@ from skill_hub.contract import NAME_RULE, SCAFFOLD_DESCRIPTION
 from skill_hub.qa import run_qa
 from skill_hub.releases import RELEASE_CONFIG, RELEASE_MANIFEST
 from skill_hub.scaffold import ScaffoldError, create_skill, render_skill
-from tests.conftest import make_skill, skill_md, write_hub
+from tests.conftest import make_skill, skill_md, sync_manifests, write_hub
 
 ALREADY = "skills/pdf-tidy already exists; choose another name or remove it"
 COULD_NOT_WRITE = "could not write skills/pdf-tidy/SKILL.md"
@@ -34,6 +34,7 @@ def test_scaffolded_skill_passes_qa_with_only_s14(tmp_path):
     make_skill(tmp_path)
     created = create_skill(tmp_path, "pdf-tidy")
     assert (created.path, created.registered) == ("skills/pdf-tidy/SKILL.md", False)
+    sync_manifests(tmp_path)
     result = run_qa(tmp_path)
     assert result.errors == []
     assert [(f.check_id, f.path) for f in result.warnings] == [("S14", "skills/pdf-tidy/SKILL.md")]
@@ -43,6 +44,7 @@ def test_scaffolded_skill_passes_qa_with_only_s14(tmp_path):
 def test_creates_skills_when_missing(tmp_path):
     write_hub(tmp_path)
     create_skill(tmp_path, "pdf-tidy")
+    sync_manifests(tmp_path)
     result = run_qa(tmp_path)
     assert result.errors == []
     assert [f.check_id for f in result.warnings] == ["S14"]
@@ -53,6 +55,7 @@ def test_creates_skills_when_missing(tmp_path):
 def test_names_yaml_would_read_as_non_strings_still_pass_qa(tmp_path, name):
     write_hub(tmp_path)
     create_skill(tmp_path, name)
+    sync_manifests(tmp_path)
     result = run_qa(tmp_path)
     assert result.errors == []
     assert [f.check_id for f in result.warnings] == ["S14"]
@@ -218,6 +221,7 @@ def test_registration_keeps_non_ascii_unescaped(tmp_path):
 def test_registered_skill_passes_qa_with_only_s14(tmp_path, name):
     release_hub(tmp_path)
     create_skill(tmp_path, name)
+    sync_manifests(tmp_path)
     result = run_qa(tmp_path)
     assert result.errors == []
     assert [f.check_id for f in result.warnings] == ["S14"]

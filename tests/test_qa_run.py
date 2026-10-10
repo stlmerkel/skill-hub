@@ -5,12 +5,13 @@ import sys
 import pytest
 
 from skill_hub.qa import run_qa
-from tests.conftest import ids, make_skill, write_hub
+from tests.conftest import ids, make_skill, sync_manifests, write_hub
 
 
 def test_clean_run(tmp_path):
     write_hub(tmp_path)
     make_skill(tmp_path)
+    sync_manifests(tmp_path)
     result = run_qa(tmp_path)
     assert result.findings == [] and result.skill_count == 1
 
@@ -36,6 +37,7 @@ def test_r3_stray_file_warns(tmp_path):
     write_hub(tmp_path)
     make_skill(tmp_path)
     (tmp_path / "skills" / "notes.txt").write_text("x", encoding="utf-8")
+    sync_manifests(tmp_path)
     result = run_qa(tmp_path)
     assert ids(result.findings) == ["R3"] and result.warnings and not result.errors
 
@@ -45,6 +47,7 @@ def test_r4_symlinked_skill_dir_warns(tmp_path):
     write_hub(tmp_path)
     make_skill(tmp_path)
     (tmp_path / "skills" / "linked").symlink_to(tmp_path / "skills" / "changelog-formatter")
+    sync_manifests(tmp_path)
     assert ids(run_qa(tmp_path).findings) == ["R4"]
 
 
@@ -77,6 +80,7 @@ def test_hidden_directory_in_skills_is_not_a_skill(tmp_path):
     hidden = tmp_path / "skills" / ".cache"
     hidden.mkdir()
     (hidden / "SKILL.md").write_text("garbage", encoding="utf-8")
+    sync_manifests(tmp_path)
     result = run_qa(tmp_path)
     assert result.findings == [] and result.skill_count == 1
 

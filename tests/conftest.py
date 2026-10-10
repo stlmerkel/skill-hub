@@ -1,6 +1,8 @@
 # tests/conftest.py
 from pathlib import Path
 
+from skill_hub.config import check_hub
+from skill_hub.manifests import render_manifests, write_manifests
 from skill_hub.skills import SKILLS_DIR
 
 GOOD_HUB = """\
@@ -63,3 +65,8 @@ def make_theme(root: Path, name: str = "theme", index: str = "<p>{{ catalog.hub.
     theme.mkdir(parents=True, exist_ok=True)
     (theme / "index.html.j2").write_text(index, encoding="utf-8")
     return theme
+
+
+def sync_manifests(root: Path) -> None:
+    """Write the hub's marketplace manifests, as `skill-hub manifests` does, so QA check R7 passes."""
+    write_manifests(root, render_manifests(root, check_hub(root)[1]))
