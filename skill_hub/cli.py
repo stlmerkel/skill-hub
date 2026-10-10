@@ -1,13 +1,15 @@
 # skill_hub/cli.py
-"""Command-line entry point: `skill-hub qa` and `skill-hub new-skill`."""
+"""Command-line entry point: `skill-hub qa`, `skill-hub new-skill` and `skill-hub build`."""
 
 import argparse
 import sys
 from pathlib import Path
 
+from skill_hub.catalog import BuildError
 from skill_hub.qa import format_report, run_qa
 from skill_hub.releases import RELEASE_CONFIG
 from skill_hub.scaffold import ScaffoldError, create_skill
+from skill_hub.site import build_site
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -19,7 +21,22 @@ def main(argv: list[str] | None = None) -> int:
     new_skill = commands.add_parser("new-skill", help="create a skill under src/ that passes QA")
     new_skill.add_argument("name", help="the skill's name: a-z, 0-9 and single hyphens")
     new_skill.add_argument("--root", type=Path, default=Path("."), help="hub root containing hub.yml (default: .)")
+    build = commands.add_parser("build", help="build the marketplace page and catalog.json from hub.yml and src/")
+    build.add_argument("--root", type=Path, default=Path("."), help="hub root containing hub.yml and src/ (default: .)")
+    build.add_argument("--out", type=Path, default=Path("site"), help="output folder (default: site)")
     args = parser.parse_args(argv)
+
+    if args.command == "build":
+        try:
+            result = build_site(args.root, args.out)
+        except BuildError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        for warning in result.warnings:
+            print(f"warning: {warning}")
+        skills = "skill" if result.skill_count == 1 else "skills"
+        print(f"Built the marketplace page for {result.skill_count} {skills} in {args.out}")
+        return 0
 
     if args.command == "new-skill":
         try:

@@ -4,7 +4,7 @@ A starter kit for standing up your own agent-skill marketplace. Clone it, set yo
 
 skill-hub is not a marketplace itself. It is the scaffolding for yours: everything that identifies your hub lives in one config file, and the skills are yours.
 
-> **Work in progress.** The skill contract, the QA guard, skill scaffolding and releases work today. The marketplace page and client install paths are next; see [Roadmap](#roadmap).
+> **Work in progress.** The skill contract, the QA guard, skill scaffolding, releases and the marketplace page build work today. Deploying the page and client install paths are next; see [Roadmap](#roadmap).
 
 ## What you get
 
@@ -13,7 +13,7 @@ skill-hub is not a marketplace itself. It is the scaffolding for yours: everythi
 | **Skill contract** | Each skill is a folder under `src/` with a `SKILL.md` that follows the [Agent Skills specification](https://agentskills.io/specification), so it installs in any client that reads the spec | Available |
 | **QA guard** | `skill-hub qa` checks your hub config and every skill: valid frontmatter, a name that matches its folder, a SemVer version, Python that compiles, and no committed secrets. It runs locally and on every pull request | Available |
 | **Semantic releases** | Conventional commits (`feat:`, `fix:`) drive version bumps and changelogs through [Release Please](https://github.com/googleapis/release-please), one version per skill | Available |
-| **Marketplace page** | A static, browsable catalog of your skills, built from `src/` and deployed to the host you choose (no GitHub Pages lock-in) | Planned |
+| **Marketplace page** | `skill-hub build` turns your skills into a static, self-contained page and a `catalog.json`, restyled from `hub.yml` or replaced by your own theme. Host it anywhere | Available |
 | **Client install paths** | Install a skill from your hub into Claude Code, Cursor or GitHub Copilot by a documented path | Planned |
 | **Skill scaffolding** | `skill-hub new-skill <name>` creates a skill that already passes QA | Available |
 
@@ -41,6 +41,8 @@ hub.yml                    your hub's identity and QA options (yours to edit)
 src/<skill>/SKILL.md       your skills, one folder each (yours)
 src/<skill>/...            optional scripts/, references/, assets/
 skill_hub/                 the QA tool (part of the kit)
+skill_hub/themes/default/  the built-in marketplace theme (copy it to make your own)
+site/                      build output from skill-hub build (git-ignored)
 tests/                     the kit's own tests
 .github/workflows/qa.yml   runs tests and skill-hub qa on every pull request
 .github/workflows/release.yml  opens release PRs and tags skill releases
@@ -91,6 +93,49 @@ Before your first release:
 
 `skill-hub new-skill` registers each new skill in `release-please-config.json`. To opt out of releases, delete `release-please-config.json` and `.release-please-manifest.json`; QA then skips its release checks.
 
+## Marketplace page
+
+`uv run skill-hub build` checks the hub with QA, then writes the marketplace page into `site/`: an `index.html` with a card for every skill and a search box, plus `catalog.json`. Any QA error stops the build; warnings don't. Upload the folder to any static host. CI builds it on every push to `main` and attaches it to the workflow run as the `marketplace-page` artifact. Use `--out PATH` to write elsewhere. The build only replaces a folder it created itself, so it refuses to write into a folder that holds anything else.
+
+Restyle the default page from `hub.yml`:
+
+```yaml
+site:
+  accent: "#4f46e5"   # hex colour for links and highlights; keep the quotes
+  logo_url: "https://example.com/logo.png"   # or a path relative to the page
+  theme: ""           # your own theme folder; empty = the built-in default
+```
+
+The default page is one file with its styles inlined and no outside requests, so it works offline and on locked-down hosts. It follows the visitor's light or dark setting, and with JavaScript off it shows every card without the search box.
+
+### Catalog format
+
+`catalog.json` is the contract every theme renders from. Version 1:
+
+```json
+{
+  "schema_version": 1,
+  "hub": {"name": "...", "display_name": "...", "owner": "...", "description": "...", "repo_url": "..."},
+  "skills": [{
+    "name": "...", "description": "...", "version": "1.2.0",
+    "license": null, "compatibility": null,
+    "links": {"source": "<repo_url>/tree/HEAD/src/<name>", "changelog": null, "release": null}
+  }]
+}
+```
+
+Skills are sorted by name. `license` and `compatibility` are `null` when the skill doesn't set them. `changelog` links to the skill's `CHANGELOG.md` when it has one, and `release` links to the `<name>-v<version>` release once Release Please has published one. New fields may be added within version 1; a breaking change bumps `schema_version`.
+
+### Custom themes
+
+A theme is a folder with an `index.html.j2` [Jinja2](https://jinja.palletsprojects.com/) template. To make your own, copy `skill_hub/themes/default/` into your hub (for example to `theme/`), set `site.theme: "theme"` in `hub.yml`, and edit it.
+
+- `index.html.j2` renders to `index.html`. Other `*.j2` files are partials it can `{% include %}`; they're not copied.
+- Every other file (CSS, images, fonts) is copied as-is, keeping its subfolders. Dot-files are skipped, and symlinks are skipped with a warning.
+- The template receives `catalog` (the data in `catalog.json`) and `site` (`accent` and `logo_url` from `hub.yml`).
+- Every value is HTML-escaped automatically, so skill text can't inject markup. An undefined variable fails the build with the file and line, instead of rendering blank.
+- A theme can't contain its own `index.html` or `catalog.json`, and it must sit inside the hub.
+
 ## QA checks
 
 `uv run skill-hub qa` prints one line per finding and exits non-zero on any error. Add `--strict` to fail on warnings too, or `--root PATH` to check another hub. Findings never print the value that triggered them, so a leaked secret doesn't end up in your CI logs.
@@ -103,6 +148,10 @@ Before your first release:
 | H4 | `hub.name` uses lowercase letters, digits and single hyphens | error |
 | H5 | `qa` is a mapping and `qa.allow_keys` is a list of strings | error |
 | H6 | `hub.name` or `repo_url` is still the kit's default | warning |
+| H7 | `site` is a mapping and `accent`, `logo_url` and `theme` are strings (an unknown key under `site` is a warning) | error |
+| H8 | `site.accent` is a hex colour such as `"#4f46e5"` | error |
+| H9 | `site.logo_url` is an `https://` URL or a relative path | error |
+| H10 | `site.theme` is a folder inside the hub root that contains `index.html.j2` | error |
 | S1 | The skill has a `SKILL.md` | error |
 | S2 | `SKILL.md` is UTF-8 and opens with a `---` frontmatter block | error |
 | S3 | The frontmatter is valid YAML and a mapping | error |
@@ -134,7 +183,7 @@ Run `uv run ruff check`, `uv run pytest` and `uv run skill-hub qa` before openin
 
 ## Roadmap
 
-1. **Catalog and marketplace page:** build a catalog from `src/` and a static page from it; the deploy step is swappable so you can use Cloudflare Pages, Netlify, an S3 bucket or your own server.
+1. **Deploying the marketplace page:** a swappable deploy step for Cloudflare Pages, Netlify, an S3 bucket or your own server.
 2. **Client install paths:** documented install for Claude Code, Cursor and GitHub Copilot, possibly an [Open Plugins](https://open-plugins.com) `marketplace.json` as well.
 
 ## Prior art

@@ -17,3 +17,9 @@ def test_default_clone_passes_with_only_identity_warnings():
     assert result.errors == []
     assert sorted(f.check_id for f in result.warnings) == ["H6", "H6"]
     assert result.skill_count == 1
+
+
+def test_default_clone_builds(tmp_path):
+    from skill_hub.site import build_site
+
+    assert build_site(SNAPSHOT, tmp_path / "out").skill_count == 1

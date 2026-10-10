@@ -11,3 +11,10 @@ qa:
   # Extra top-level SKILL.md frontmatter keys to accept. Leave empty to keep every
   # skill installable everywhere; add e.g. when_to_use only if you target Claude Code alone.
   allow_keys: []
+
+site:
+  # The marketplace page that `skill-hub build` writes. Keep every value quoted:
+  # an unquoted #4f46e5 is a YAML comment, not a colour.
+  accent: ""     # hex colour for links and highlights, e.g. "#4f46e5"; empty = the theme's default
+  logo_url: ""   # https:// URL or a path relative to the page; empty = no logo
+  theme: ""      # your theme folder, relative to this file; empty = the built-in default

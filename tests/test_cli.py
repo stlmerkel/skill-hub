@@ -1,6 +1,8 @@
 import json
+import os
 import subprocess
 import sys
+from pathlib import Path
 
 from skill_hub.cli import main
 from skill_hub.findings import WARNING, Finding
@@ -148,3 +150,33 @@ def test_new_skill_registered_has_no_skip_line(tmp_path, capsys):
     ]
     config = json.loads((tmp_path / "release-please-config.json").read_text(encoding="utf-8"))
     assert "src/pdf-tidy" in config["packages"]
+
+
+FIXTURE = Path(__file__).parent / "fixtures" / "default-clone"
+
+
+def test_build_exit_zero_and_summary(tmp_path, capsys):
+    out = tmp_path / "out"
+    assert main(["build", "--root", str(FIXTURE), "--out", str(out)]) == 0
+    assert capsys.readouterr().out.strip() == f"Built the marketplace page for 1 skill in {out}"
+    assert (out / "index.html").is_file()
+
+
+def test_build_error_exit_one_on_stderr(tmp_path, capsys):
+    write_hub(tmp_path)
+    make_skill(tmp_path, "foo", skill_md("Foo"))
+    assert main(["build", "--root", str(tmp_path), "--out", str(tmp_path / "out")]) == 1
+    captured = capsys.readouterr()
+    assert captured.err.startswith("error: QA found 1 error") and captured.out == ""
+
+
+def test_build_prints_theme_warnings(tmp_path, capsys):
+    write_hub(tmp_path, GOOD_HUB + 'site:\n  theme: "theme"\n')
+    make_skill(tmp_path)
+    theme = tmp_path / "theme"
+    theme.mkdir()
+    (theme / "index.html.j2").write_text("x", encoding="utf-8")
+    (tmp_path / "real.css").write_text("x", encoding="utf-8")
+    os.symlink(tmp_path / "real.css", theme / "linked.css")
+    assert main(["build", "--root", str(tmp_path), "--out", str(tmp_path / "out")]) == 0
+    assert capsys.readouterr().out.splitlines()[0] == "warning: theme/linked.css: symlink in theme is not followed"

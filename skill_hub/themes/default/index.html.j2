@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ catalog.hub.display_name }}</title>
+<meta name="description" content="{{ catalog.hub.description }}">
+<style>
+{% include "_style.css.j2" %}
+</style>
+</head>
+<body>
+<header class="hub-header">
+  {% if site.logo_url %}<img class="hub-logo" src="{{ site.logo_url }}" alt="{{ catalog.hub.display_name }}">{% endif %}
+  <div>
+    <h1>{{ catalog.hub.display_name }}</h1>
+    <p class="hub-description">{{ catalog.hub.description }}</p>
+    <p class="hub-owner">Maintained by {{ catalog.hub.owner }}</p>
+  </div>
+</header>
+<main>
+  <div class="search" id="search" hidden>
+    <label for="search-input">Search skills</label>
+    <input type="search" id="search-input" autocomplete="off">
+  </div>
+  <p class="no-results" id="no-results" aria-live="polite"></p>
+  <div class="grid">
+  {% for skill in catalog.skills %}
+    <article class="card" data-name="{{ skill.name }}" data-description="{{ skill.description }}">
+      <div class="card-head">
+        <h2>{{ skill.name }}</h2>
+        <span class="version">v{{ skill.version }}</span>
+      </div>
+      <p>{{ skill.description }}</p>
+      {% if skill.license %}<p class="license">License: {{ skill.license }}</p>{% endif %}
+      <ul class="links">
+        <li><a href="{{ skill.links.source }}">Source</a></li>
+        {% if skill.links.changelog %}<li><a href="{{ skill.links.changelog }}">Changelog</a></li>{% endif %}
+        {% if skill.links.release %}<li><a href="{{ skill.links.release }}">Release notes</a></li>{% endif %}
+      </ul>
+    </article>
+  {% endfor %}
+  </div>
+</main>
+<footer><a href="{{ catalog.hub.repo_url }}">Source repository</a></footer>
+<script>
+(function () {
+  var box = document.getElementById("search");
+  var input = document.getElementById("search-input");
+  var status = document.getElementById("no-results");
+  var cards = Array.prototype.slice.call(document.querySelectorAll(".card"));
+  box.hidden = false;
+  input.addEventListener("input", function () {
+    var query = input.value.trim().toLowerCase();
+    var shown = 0;
+    cards.forEach(function (card) {
+      var hit = !query ||
+        card.dataset.name.toLowerCase().indexOf(query) !== -1 ||
+        card.dataset.description.toLowerCase().indexOf(query) !== -1;
+      card.hidden = !hit;
+      if (hit) { shown += 1; }
+    });
+    status.textContent = shown ? "" : "No skills match";
+  });
+})();
+</script>
+</body>
+</html>
