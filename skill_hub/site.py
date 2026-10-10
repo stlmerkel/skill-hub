@@ -54,9 +54,10 @@ def _static_files(theme_dir: Path, warnings: list[str]) -> list[Path]:
     return files
 
 
-def _template_error(exc: jinja2.TemplateError, theme_dir: Path) -> BuildError:
+def _template_error(exc: Exception, theme_dir: Path) -> BuildError:
     """A BuildError naming the theme file and line where rendering failed."""
-    message = exc.message or type(exc).__name__
+    # Only Jinja's own messages are shown: str() of any other exception can echo a hub or skill value.
+    message = (exc.message if isinstance(exc, jinja2.TemplateError) else None) or type(exc).__name__
     if isinstance(exc, jinja2.TemplateSyntaxError) and exc.name:
         return BuildError(f"{theme_dir.name}/{exc.name}:{exc.lineno}: {message}")
     # Jinja rewrites tracebacks so template frames carry the template's path and line.
@@ -82,10 +83,13 @@ def render_theme(catalog: dict, site: SiteSettings, theme_dir: Path, dest: Path)
     context = {"catalog": catalog, "site": {"accent": site.accent, "logo_url": site.logo_url}}
     try:
         html = environment.get_template(THEME_ENTRY).render(context)
-    except jinja2.TemplateError as exc:
+    except jinja2.TemplateError as exc:  # first: TemplateNotFound is an OSError too
         raise _template_error(exc, theme_dir) from None
     except (OSError, UnicodeDecodeError):
-        raise BuildError(f"theme {theme_dir.name}: a template could not be read as UTF-8 text") from None
+        message = "a template could not be read (missing, unreadable or not UTF-8)"
+        raise BuildError(f"theme {theme_dir.name}: {message}") from None
+    except Exception as exc:  # a theme is adopter input: any runtime error is a finding, not a traceback
+        raise _template_error(exc, theme_dir) from None
     (dest / INDEX_FILE).write_text(html, encoding="utf-8")
     for rel in files:
         target = dest / rel
@@ -119,6 +123,9 @@ def write_site(catalog: dict, site: SiteSettings, theme_dir: Path, out: Path) ->
     """Build into a temp folder beside out, then swap it in; out is untouched on any failure."""
     _check_out(out)
     target = out.resolve()
+    theme_dir = theme_dir.resolve()
+    if target == theme_dir or theme_dir.is_relative_to(target) or target.is_relative_to(theme_dir):
+        raise BuildError(f"{out} overlaps the theme folder; choose another --out")
     token = uuid.uuid4().hex[:8]
     temp = target.with_name(f".{target.name}.tmp-{token}")
     try:

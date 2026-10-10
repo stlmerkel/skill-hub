@@ -203,6 +203,12 @@ def test_h10_theme_symlink_to_outside(tmp_path):
     assert ids(check_hub(root)[0]) == ["H10"]
 
 
+def test_h10_theme_with_a_nul_is_a_finding(tmp_path):
+    nul = "\\" + "0"  # built by concatenation so no tool turns the escape into a character (L72)
+    write_hub(tmp_path, site_hub(f'  theme: "a{nul}b"\n'))
+    assert ids(check_hub(tmp_path)[0]) == ["H10"]
+
+
 def test_h10_theme_cannot_be_the_hub_root(tmp_path):
     (tmp_path / "index.html.j2").write_text("x", encoding="utf-8")
     write_hub(tmp_path, site_hub('  theme: "."\n'))

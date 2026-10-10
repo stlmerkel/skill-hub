@@ -120,8 +120,27 @@ def test_missing_partial_names_it(tmp_path):
 def test_template_that_is_not_utf8(tmp_path):
     theme = make_theme(tmp_path)
     (theme / "index.html.j2").write_bytes(b"\xff\xfe")
-    with pytest.raises(BuildError, match="could not be read as UTF-8"):
+    with pytest.raises(BuildError, match="a template could not be read"):
         render(tmp_path, theme)
+
+
+@pytest.mark.parametrize(
+    ("index", "error"),
+    [
+        ("ok\n{{ 1/0 }}\n", "ZeroDivisionError"),
+        ("ok\n{{ catalog.hub.name + 1 }}\n", "TypeError"),
+        ('ok\n{% include "index.html.j2" %}\n', "RecursionError"),
+    ],
+)
+def test_runtime_template_error_names_file_and_line(tmp_path, index, error):
+    theme = make_theme(tmp_path, index=index)
+    catalog = {**CATALOG, "hub": {**CATALOG["hub"], "name": "zyzzyva-hub-name"}}
+    with pytest.raises(BuildError) as caught:
+        render_theme(catalog, SiteSettings(), theme, tmp_path)
+    message = str(caught.value)
+    assert message.startswith("theme/index.html.j2:2: ")
+    assert error in message
+    assert "zyzzyva" not in message
 
 
 def test_missing_theme_folder(tmp_path):
@@ -245,6 +264,25 @@ def test_theme_folder_as_out_is_refused_and_kept(tmp_path):
     with pytest.raises(BuildError, match="was not created by skill-hub build"):
         build_site(root, root / "site")
     assert (root / "site" / "index.html.j2").is_file()
+
+
+def test_theme_inside_a_marked_out_is_refused_and_kept(tmp_path):
+    root = themed_hub(tmp_path)
+    build_site(root, root / "site")
+    theme = make_theme(root / "site", "mytheme")
+    write_hub(root, GOOD_HUB + 'site:\n  theme: "site/mytheme"\n')
+    with pytest.raises(BuildError, match="overlaps the theme folder"):
+        build_site(root, root / "site")
+    assert entries(theme) == ["index.html.j2"]
+    assert (root / "site" / MARKER_FILE).is_file()
+
+
+def test_out_inside_the_theme_is_refused_and_nothing_is_created(tmp_path):
+    theme = make_theme(tmp_path)
+    with pytest.raises(BuildError, match="overlaps the theme folder"):
+        write_site(CATALOG, SiteSettings(), theme, theme / "out")
+    assert entries(theme) == ["index.html.j2"]
+    assert entries(tmp_path) == ["theme"]
 
 
 def test_lone_surrogate_is_a_build_error_not_a_traceback(tmp_path):

@@ -47,7 +47,7 @@ def _check_theme(root: Path, theme: str) -> list[Finding]:
     try:
         hub_root = root.resolve()
         folder = (root / theme).resolve()
-    except (OSError, RuntimeError):  # RuntimeError: a symlink loop, on Python 3.11 and 3.12
+    except (OSError, RuntimeError, ValueError):  # RuntimeError: a symlink loop on 3.11/3.12; ValueError: a NUL
         return [_error("H10", "site.theme could not be resolved")]
     if folder == hub_root or not folder.is_relative_to(hub_root):
         return [_error("H10", "site.theme must be a folder inside the hub root")]
