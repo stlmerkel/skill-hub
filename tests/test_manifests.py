@@ -78,8 +78,9 @@ def test_write_lone_surrogate_is_a_manifest_error(tmp_path):
     write_hub(tmp_path)
     escape = "\\" + "ud800"  # built by concatenation so no tool turns it into a character (L72)
     make_skill(tmp_path, "notes", skill_md("notes").replace("Formats", escape + " Formats"))
-    with pytest.raises(ManifestError):
+    with pytest.raises(ManifestError, match=r"^could not write \.claude-plugin/marketplace\.json$"):
         write_manifests(tmp_path, render_manifests(tmp_path, check_hub(tmp_path)[1]))
+    assert os.listdir(tmp_path / ".claude-plugin") == []
 
 
 def test_r7_fresh(tmp_path):

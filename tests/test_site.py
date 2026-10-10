@@ -286,12 +286,14 @@ def test_out_inside_the_theme_is_refused_and_nothing_is_created(tmp_path):
     assert entries(tmp_path) == ["theme"]
 
 
-def test_lone_surrogate_is_a_build_error_not_a_traceback(tmp_path):
+def test_lone_surrogate_is_a_build_error_not_a_traceback(tmp_path, monkeypatch):
+    # R7 is patched out: the surrogate can never be written to a manifest, so R7 would fail QA before the build
+    monkeypatch.setattr("skill_hub.qa.check_manifests", lambda root, config: [])
     root = themed_hub(tmp_path / "hub")
     escape = "\\" + "ud800"  # built by concatenation so no tool turns it into a character (L72)
     text = skill_md().replace('description: "Formats', f'description: "{escape} Formats')
     (root / "skills" / "changelog-formatter" / "SKILL.md").write_text(text, encoding="utf-8")
-    with pytest.raises(BuildError):
+    with pytest.raises(BuildError, match=r"cannot be written as UTF-8"):
         build_site(root, tmp_path / "out")
     assert not (tmp_path / "out").exists()
     assert [p.name for p in tmp_path.iterdir()] == ["hub"]
