@@ -54,3 +54,10 @@ def make_skill(root: Path, dirname: str = "changelog-formatter", text: str | Non
 
 def ids(findings) -> list[str]:
     return sorted(finding.check_id for finding in findings)
+
+
+def make_theme(root: Path, name: str = "theme", index: str = "<p>{{ catalog.hub.display_name }}</p>\n") -> Path:
+    theme = root / name
+    theme.mkdir(parents=True, exist_ok=True)
+    (theme / "index.html.j2").write_text(index, encoding="utf-8")
+    return theme

@@ -1,14 +1,31 @@
-"""Load and check hub.yml (checks H1-H6)."""
+"""Load and check hub.yml (checks H1-H10)."""
 
 from dataclasses import dataclass
 from pathlib import Path
 
-from skill_hub.contract import DEFAULT_HUB_NAME, DEFAULT_REPO_URL, is_blank, is_valid_name, type_name
+from skill_hub.contract import (
+    DEFAULT_HUB_NAME,
+    DEFAULT_REPO_URL,
+    is_blank,
+    is_hex_colour,
+    is_safe_logo_url,
+    is_valid_name,
+    type_name,
+)
 from skill_hub.findings import ERROR, WARNING, Finding
 from skill_hub.yamlutil import load_yaml
 
 HUB_FILE = "hub.yml"
 REQUIRED_HUB_KEYS = ("name", "display_name", "owner", "description", "repo_url")
+SITE_KEYS = ("accent", "logo_url", "theme")
+THEME_ENTRY = "index.html.j2"
+
+
+@dataclass(frozen=True)
+class SiteSettings:
+    accent: str = ""
+    logo_url: str = ""
+    theme: str = ""
 
 
 @dataclass(frozen=True)
@@ -19,10 +36,60 @@ class HubConfig:
     description: str
     repo_url: str
     allow_keys: tuple[str, ...]
+    site: SiteSettings = SiteSettings()
 
 
 def _error(check_id: str, message: str, line: int | None = None) -> Finding:
     return Finding(ERROR, check_id, HUB_FILE, message, line)
+
+
+def _check_theme(root: Path, theme: str) -> list[Finding]:
+    try:
+        hub_root = root.resolve()
+        folder = (root / theme).resolve()
+    except (OSError, RuntimeError):  # RuntimeError: a symlink loop, on Python 3.11 and 3.12
+        return [_error("H10", "site.theme could not be resolved")]
+    if folder == hub_root or not folder.is_relative_to(hub_root):
+        return [_error("H10", "site.theme must be a folder inside the hub root")]
+    if not folder.is_dir():
+        return [_error("H10", "site.theme folder not found")]
+    entry = folder / THEME_ENTRY
+    if entry.is_symlink() or not entry.is_file():
+        return [_error("H10", f"site.theme has no {THEME_ENTRY}")]
+    return []
+
+
+def _check_site(root: Path, data: dict) -> tuple[list[Finding], SiteSettings]:
+    site = data.get("site")
+    if site is None:  # absent, or a `site:` block with every key commented out
+        return [], SiteSettings()
+    if not isinstance(site, dict):
+        return [_error("H7", f"site must be a mapping, found {type_name(site)}")], SiteSettings()
+
+    findings: list[Finding] = []
+    if any(key not in SITE_KEYS for key in site):
+        message = "site has an unknown key; expected accent, logo_url or theme"
+        findings.append(Finding(WARNING, "H7", HUB_FILE, message))
+    values: dict[str, str] = {}
+    for key in SITE_KEYS:
+        if key not in site:
+            continue
+        value = site[key]
+        if isinstance(value, str):
+            values[key] = value
+        else:
+            findings.append(_error("H7", f"site.{key} must be a string, found {type_name(value)}; quote it"))
+
+    accent = values.get("accent", "")
+    if accent and not is_hex_colour(accent):
+        findings.append(_error("H8", 'site.accent must be a hex colour such as "#4f46e5"'))
+    logo_url = values.get("logo_url", "")
+    if logo_url and not is_safe_logo_url(logo_url):
+        findings.append(_error("H9", "site.logo_url must be an https:// URL or a relative path"))
+    theme = values.get("theme", "")
+    if theme:
+        findings.extend(_check_theme(root, theme))
+    return findings, SiteSettings(**values)
 
 
 def check_hub(root: Path) -> tuple[list[Finding], HubConfig | None]:
@@ -84,6 +151,9 @@ def check_hub(root: Path) -> tuple[list[Finding], HubConfig | None]:
         else:
             allow_keys = tuple(keys)
 
+    site_findings, site = _check_site(root, data)
+    findings.extend(site_findings)
+
     if any(finding.level == ERROR for finding in findings):
         return findings, None
-    return findings, HubConfig(*(hub[key] for key in REQUIRED_HUB_KEYS), allow_keys=allow_keys)
+    return findings, HubConfig(*(hub[key] for key in REQUIRED_HUB_KEYS), allow_keys=allow_keys, site=site)

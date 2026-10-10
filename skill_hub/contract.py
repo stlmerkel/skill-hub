@@ -59,3 +59,22 @@ def type_name(value: object) -> str:
     if isinstance(value, dict):
         return "mapping"
     return type(value).__name__
+
+
+_HEX_COLOUR_RE = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})", re.ASCII)
+_URL_SCHEME_RE = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*:", re.ASCII)
+_HTTPS = "https://"
+
+
+def is_hex_colour(value: str) -> bool:
+    return _HEX_COLOUR_RE.fullmatch(value) is not None
+
+
+def is_safe_logo_url(value: str) -> bool:
+    """An https:// URL or a relative path: never a script-capable, plain-http or protocol-relative URL."""
+    # Browsers strip leading whitespace and control characters and read a backslash as a slash.
+    if "\\" in value or any(ord(char) <= 0x20 or ord(char) == 0x7F for char in value):
+        return False
+    if value.startswith(_HTTPS):
+        return len(value) > len(_HTTPS)
+    return not value.startswith("//") and _URL_SCHEME_RE.match(value) is None

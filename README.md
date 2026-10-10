@@ -103,6 +103,10 @@ Before your first release:
 | H4 | `hub.name` uses lowercase letters, digits and single hyphens | error |
 | H5 | `qa` is a mapping and `qa.allow_keys` is a list of strings | error |
 | H6 | `hub.name` or `repo_url` is still the kit's default | warning |
+| H7 | `site` is a mapping and `accent`, `logo_url` and `theme` are strings (an unknown key under `site` is a warning) | error |
+| H8 | `site.accent` is a hex colour such as `"#4f46e5"` | error |
+| H9 | `site.logo_url` is an `https://` URL or a relative path | error |
+| H10 | `site.theme` is a folder inside the hub root that contains `index.html.j2` | error |
 | S1 | The skill has a `SKILL.md` | error |
 | S2 | `SKILL.md` is UTF-8 and opens with a `---` frontmatter block | error |
 | S3 | The frontmatter is valid YAML and a mapping | error |
