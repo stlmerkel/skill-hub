@@ -23,3 +23,20 @@ jobs:
       - run: uv run --locked ruff check
       - run: uv run --locked pytest
       - run: uv run --locked skill-hub qa
+
+  build:
+    needs: qa
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.11"
+      - run: uv sync --locked
+      - run: uv run --locked skill-hub build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: marketplace-page
+          path: site/
+          if-no-files-found: error
