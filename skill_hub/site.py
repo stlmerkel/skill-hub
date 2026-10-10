@@ -140,13 +140,21 @@ def write_site(catalog: dict, site: SiteSettings, theme_dir: Path, out: Path) ->
     except BaseException:
         shutil.rmtree(temp, ignore_errors=True)
         raise
-    if target.exists():
-        old = target.with_name(f".{target.name}.old-{token}")
-        target.rename(old)
-        temp.rename(target)
-        shutil.rmtree(old, ignore_errors=True)
-    else:
-        temp.rename(target)
+    old = target.with_name(f".{target.name}.old-{token}")
+    try:
+        if target.exists():
+            target.rename(old)
+            try:
+                temp.rename(target)
+            except OSError:
+                old.rename(target)
+                raise
+            shutil.rmtree(old, ignore_errors=True)
+        else:
+            temp.rename(target)
+    except OSError:
+        shutil.rmtree(temp, ignore_errors=True)
+        raise BuildError(f"could not replace the output folder {out}") from None
     return warnings
 
 

@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 
 import pytest
 
@@ -255,3 +256,27 @@ def test_lone_surrogate_is_a_build_error_not_a_traceback(tmp_path):
         build_site(root, tmp_path / "out")
     assert not (tmp_path / "out").exists()
     assert [p.name for p in tmp_path.iterdir()] == ["hub"]
+
+
+@pytest.mark.parametrize("failing_call", [1, 2])
+def test_failed_swap_rolls_back_and_leaves_no_temp_folders(tmp_path, monkeypatch, failing_call):
+    theme = make_theme(tmp_path)
+    out = tmp_path / "out"
+    write_site(CATALOG, SiteSettings(), theme, out)
+    previous = (out / "index.html").read_bytes()
+    real_rename = Path.rename
+    calls = []
+
+    def flaky(self, target):
+        calls.append(self)
+        if len(calls) == failing_call:
+            raise PermissionError("denied")
+        return real_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", flaky)
+    with pytest.raises(BuildError, match="could not replace the output folder"):
+        write_site(CATALOG, SiteSettings(), theme, out)
+    monkeypatch.undo()
+    assert (out / "index.html").read_bytes() == previous
+    assert (out / MARKER_FILE).is_file()
+    assert entries(tmp_path) == ["out", "theme"]
