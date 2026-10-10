@@ -38,9 +38,15 @@ def test_full_shape_and_key_order(tmp_path):
                 "changelog": None,
                 "release": None,
             },
+            "install": {
+                "claude_code": "claude plugin install changelog-formatter --marketplace acme/skills",
+                "gh_skill": None,
+            },
         }
     ]
-    assert list(catalog["skills"][0]) == ["name", "description", "version", "license", "compatibility", "links"]
+    assert list(catalog["skills"][0]) == [
+        "name", "description", "version", "license", "compatibility", "links", "install",
+    ]
     assert json.loads(json.dumps(catalog)) == catalog
 
 
@@ -114,3 +120,23 @@ def test_qa_warnings_do_not_block(tmp_path):
     make_skill(tmp_path)
     sync_manifests(tmp_path)
     assert require_clean_qa(tmp_path).name == "my-skill-hub"
+
+
+def test_install_gh_skill_pinned_once_released(tmp_path):
+    write_hub(tmp_path)
+    make_skill(tmp_path, "released")
+    (tmp_path / "release-please-config.json").write_text(
+        json.dumps({"packages": {"skills/released": {}}}), encoding="utf-8"
+    )
+    (tmp_path / ".release-please-manifest.json").write_text('{"skills/released": "1.0.0"}', encoding="utf-8")
+    sync_manifests(tmp_path)
+    (skill,) = catalog_for(tmp_path)["skills"]
+    assert skill["install"]["gh_skill"] == "gh skill install acme/skills released@released-v1.0.0"
+
+
+def test_install_is_null_for_a_non_github_repo(tmp_path):
+    write_hub(tmp_path, GOOD_HUB.replace("https://github.com/acme/skills", "https://gitlab.com/acme/skills"))
+    make_skill(tmp_path)
+    sync_manifests(tmp_path)
+    (skill,) = catalog_for(tmp_path)["skills"]
+    assert skill["install"] is None

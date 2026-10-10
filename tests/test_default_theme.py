@@ -99,3 +99,21 @@ def test_logo_accent_license_and_links(tmp_path):
 def test_default_accent_when_unset(tmp_path):
     build_site(SNAPSHOT, tmp_path / "out")
     assert "--accent: #4f46e5;" in (tmp_path / "out" / "index.html").read_text(encoding="utf-8")
+
+
+def test_install_commands_render_without_script_buttons(tmp_path):
+    build_site(SNAPSHOT, tmp_path / "out")
+    html = (tmp_path / "out" / "index.html").read_text(encoding="utf-8")
+    built = Page(html)
+    assert built.all("button") == []
+    assert "claude plugin install example-skill --marketplace you/your-hub" in "".join(built.text)
+    assert "gh skill install" not in html  # the fixture's example skill is not released
+
+
+def test_no_install_block_for_a_non_github_repo(tmp_path):
+    write_hub(tmp_path, GOOD_HUB.replace("https://github.com/acme/skills", "https://gitlab.com/acme/skills"))
+    make_skill(tmp_path)
+    sync_manifests(tmp_path)
+    build_site(tmp_path, tmp_path / "out")
+    built = page(tmp_path / "out")
+    assert [a for a in built.all("div") if a.get("class") == "install"] == []

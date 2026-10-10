@@ -119,12 +119,13 @@ The default page is one file with its styles inlined and no outside requests, so
   "skills": [{
     "name": "...", "description": "...", "version": "1.2.0",
     "license": null, "compatibility": null,
-    "links": {"source": "<repo_url>/tree/HEAD/skills/<name>", "changelog": null, "release": null}
+    "links": {"source": "<repo_url>/tree/HEAD/skills/<name>", "changelog": null, "release": null},
+    "install": {"claude_code": "...", "gh_skill": "..."}
   }]
 }
 ```
 
-Skills are sorted by name. `license` and `compatibility` are `null` when the skill doesn't set them. `changelog` links to the skill's `CHANGELOG.md` when it has one, and `release` links to the `<name>-v<version>` release once Release Please has published one. New fields may be added within version 1; a breaking change bumps `schema_version`.
+Skills are sorted by name. `install` is `null` unless `repo_url` is a `https://github.com/<owner>/<repo>` URL, and `gh_skill` is `null` until the skill's first release. `license` and `compatibility` are `null` when the skill doesn't set them. `changelog` links to the skill's `CHANGELOG.md` when it has one, and `release` links to the `<name>-v<version>` release once Release Please has published one. New fields may be added within version 1; a breaking change bumps `schema_version`.
 
 ### Custom themes
 

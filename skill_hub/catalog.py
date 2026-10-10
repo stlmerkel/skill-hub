@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from skill_hub.config import REQUIRED_HUB_KEYS, HubConfig, check_hub
+from skill_hub.contract import github_repo
 from skill_hub.qa import run_qa
 from skill_hub.releases import check_release
 from skill_hub.skills import SKILLS_DIR, read_frontmatter, skill_dirs
@@ -26,6 +27,7 @@ def require_clean_qa(root: Path) -> HubConfig:
 def build_catalog(root: Path, config: HubConfig) -> dict:
     """The catalog of a hub that passed QA (see require_clean_qa)."""
     repo = config.repo_url.rstrip("/")
+    slug = github_repo(config.repo_url)
     dirs = skill_dirs(root)
     _, released, _ = check_release(root, [skill_dir.name for skill_dir in dirs])
     skills = []
@@ -44,6 +46,10 @@ def build_catalog(root: Path, config: HubConfig) -> dict:
                 "source": f"{repo}/tree/HEAD/{SKILLS_DIR}/{name}",
                 "changelog": f"{repo}/blob/HEAD/{SKILLS_DIR}/{name}/{CHANGELOG_FILE}" if has_changelog else None,
                 "release": f"{repo}/releases/tag/{name}-v{released[name]}" if name in released else None,
+            },
+            "install": None if slug is None else {
+                "claude_code": f"claude plugin install {name} --marketplace {slug}",
+                "gh_skill": f"gh skill install {slug} {name}@{name}-v{released[name]}" if name in released else None,
             },
         })
     skills.sort(key=lambda skill: skill["name"])
