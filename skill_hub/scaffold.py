@@ -1,4 +1,4 @@
-"""Create a skill under src/ from the built-in template: `skill-hub new-skill`."""
+"""Create a skill under skills/ from the built-in template: `skill-hub new-skill`."""
 
 import json
 import shutil
@@ -7,8 +7,8 @@ from pathlib import Path
 
 from skill_hub.config import HUB_FILE
 from skill_hub.contract import NAME_RULE, SCAFFOLD_DESCRIPTION, is_valid_name
-from skill_hub.qa import SKILL_FILE, SRC_DIR
 from skill_hub.releases import RELEASE_CONFIG
+from skill_hub.skills import SKILL_FILE, SKILLS_DIR
 
 TEMPLATE = """\
 ---
@@ -65,22 +65,22 @@ def render_skill(name: str) -> str:
 
 
 def create_skill(root: Path, name: str) -> Created:
-    """Write src/<name>/SKILL.md under root, register it for release, and report what was done."""
+    """Write skills/<name>/SKILL.md under root, register it for release, and report what was done."""
     if not is_valid_name(name):
         raise ScaffoldError(NAME_RULE)
-    rel = f"{SRC_DIR}/{name}/{SKILL_FILE}"
-    already = f"{SRC_DIR}/{name} already exists; choose another name or remove it"
-    src = root / SRC_DIR
-    skill_dir = src / name
+    rel = f"{SKILLS_DIR}/{name}/{SKILL_FILE}"
+    already = f"{SKILLS_DIR}/{name} already exists; choose another name or remove it"
+    skills_root = root / SKILLS_DIR
+    skill_dir = skills_root / name
     try:
         if not root.is_dir():
             raise ScaffoldError("--root is not a directory")
         if not (root / HUB_FILE).is_file():
             raise ScaffoldError(f"{HUB_FILE} not found; run this from your hub's root or pass --root")
-        if (src.exists() or src.is_symlink()) and not src.is_dir():
-            raise ScaffoldError(f"{SRC_DIR} is not a directory")
+        if (skills_root.exists() or skills_root.is_symlink()) and not skills_root.is_dir():
+            raise ScaffoldError(f"{SKILLS_DIR} is not a directory")
         release = _read_release_config(root / RELEASE_CONFIG)
-        src.mkdir(exist_ok=True)
+        skills_root.mkdir(exist_ok=True)
         skill_dir.mkdir()  # refuses any existing entry: folder, file or broken symlink
     except FileExistsError:
         raise ScaffoldError(already) from None
@@ -94,7 +94,7 @@ def create_skill(root: Path, name: str) -> Created:
     if release is None:
         return Created(rel, registered=False)
     config, original = release
-    config["packages"][f"{SRC_DIR}/{name}"] = {"component": name, "extra-files": [SKILL_FILE]}
+    config["packages"][f"{SKILLS_DIR}/{name}"] = {"component": name, "extra-files": [SKILL_FILE]}
     config_path = root / RELEASE_CONFIG
     try:
         config_path.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")

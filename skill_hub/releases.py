@@ -9,7 +9,7 @@ from skill_hub.findings import ERROR, Finding
 RELEASE_CONFIG = "release-please-config.json"
 RELEASE_MANIFEST = ".release-please-manifest.json"
 VERSION_FILE = "version.txt"  # written into each skill by Release Please's simple release type
-PACKAGE_PREFIX = "src/"
+PACKAGE_PREFIX = "skills/"
 DEFAULT_INITIAL_VERSION = "1.0.0"  # what Release Please releases first when initial-version is unset
 
 
@@ -70,7 +70,7 @@ def check_release(root: Path, skill_names: list[str]) -> tuple[list[Finding], di
             if is_valid_name(name):
                 findings.append(Finding(ERROR, "R6", key, f"listed in {source} but is not a skill"))
             else:
-                findings.append(Finding(ERROR, "R6", source, "an entry under src/ is not a skill"))
+                findings.append(Finding(ERROR, "R6", source, "an entry under skills/ is not a skill"))
 
     released = {
         key[len(PACKAGE_PREFIX):]: version

@@ -33,6 +33,19 @@
       </div>
       <p>{{ skill.description }}</p>
       {% if skill.license %}<p class="license">License: {{ skill.license }}</p>{% endif %}
+      {% if skill.install %}
+      <div class="install">
+        <h3>Install</h3>
+        <dl>
+          <dt>Claude Code</dt>
+          <dd><code>{{ skill.install.claude_code }}</code></dd>
+          {% if skill.install.gh_skill %}
+          <dt>GitHub Copilot (gh skill)</dt>
+          <dd><code>{{ skill.install.gh_skill }}</code></dd>
+          {% endif %}
+        </dl>
+      </div>
+      {% endif %}
       <ul class="links">
         <li><a href="{{ skill.links.source }}">Source</a></li>
         {% if skill.links.changelog %}<li><a href="{{ skill.links.changelog }}">Changelog</a></li>{% endif %}
@@ -61,6 +74,20 @@
       if (hit) { shown += 1; }
     });
     status.textContent = shown ? "" : "No skills match";
+  });
+  Array.prototype.slice.call(document.querySelectorAll(".install code")).forEach(function (code) {
+    var button = document.createElement("button");
+    var label = code.parentNode.previousElementSibling.textContent;
+    button.type = "button";
+    button.className = "copy";
+    button.textContent = "Copy";
+    button.setAttribute("aria-label", "Copy the " + label + " install command");
+    button.addEventListener("click", function () {
+      var failed = function () { status.textContent = "Copy failed; select the command instead"; };
+      if (!navigator.clipboard) { failed(); return; }
+      navigator.clipboard.writeText(code.textContent).then(function () { status.textContent = "Copied"; }, failed);
+    });
+    code.parentNode.appendChild(button);
   });
 })();
 </script>

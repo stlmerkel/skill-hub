@@ -7,7 +7,7 @@ import pytest
 
 from skill_hub.contract import SCAFFOLD_DESCRIPTION
 from skill_hub.qa import check_skill, run_qa
-from tests.conftest import ids, make_skill, skill_md, write_hub
+from tests.conftest import ids, make_skill, skill_md, sync_manifests, write_hub
 
 LIVE = "s3cr3t" + "Value99"
 
@@ -21,13 +21,13 @@ def test_good_skill_has_no_findings(tmp_path):
 
 
 def test_s1_missing_skill_md(tmp_path):
-    skill = tmp_path / "src" / "empty"
+    skill = tmp_path / "skills" / "empty"
     skill.mkdir(parents=True)
     assert ids(check_skill(skill, ())) == ["S1"]
 
 
 def test_s1_skill_md_is_directory(tmp_path):
-    skill = tmp_path / "src" / "odd"
+    skill = tmp_path / "skills" / "odd"
     (skill / "SKILL.md").mkdir(parents=True)
     assert ids(check_skill(skill, ())) == ["S1"]
 
@@ -214,8 +214,8 @@ def test_hidden_files_and_dirs_inside_a_skill_are_scanned(tmp_path):
     findings = check_skill(skill, ())
     assert ids(findings) == ["S10", "S10"]
     assert sorted(f.path for f in findings) == [
-        "src/changelog-formatter/.env",
-        "src/changelog-formatter/.secrets/x.txt",
+        "skills/changelog-formatter/.env",
+        "skills/changelog-formatter/.secrets/x.txt",
     ]
     assert all(LIVE not in f.message for f in findings)
 
@@ -279,7 +279,7 @@ def test_s13_unreadable_skill_directory_is_one_finding(tmp_path, mode):
     finally:
         skill.chmod(0o755)
     assert [(f.level, f.check_id, f.path, f.message) for f in findings] == [
-        ("error", "S13", "src/changelog-formatter", "directory could not be read")
+        ("error", "S13", "skills/changelog-formatter", "directory could not be read")
     ]
 
 
@@ -289,7 +289,7 @@ def test_non_regular_file_is_skipped_with_warning(tmp_path):
     os.mkfifo(skill / "pipe")
     findings = check_skill(skill, ())
     assert [(f.level, f.check_id, f.path, f.message) for f in findings] == [
-        ("warning", "S12", "src/changelog-formatter/pipe", "not a regular file; not scanned")
+        ("warning", "S12", "skills/changelog-formatter/pipe", "not a regular file; not scanned")
     ]
 
 
@@ -303,9 +303,10 @@ def _placeholder_skill(description_yaml: str) -> str:
 def test_scaffold_placeholder_description_is_s14_warning(tmp_path):
     write_hub(tmp_path)
     make_skill(tmp_path, text=_placeholder_skill(f'"{SCAFFOLD_DESCRIPTION}"'))
+    sync_manifests(tmp_path)
     result = run_qa(tmp_path)
     assert result.errors == []
-    assert [(f.check_id, f.path) for f in result.warnings] == [("S14", "src/changelog-formatter/SKILL.md")]
+    assert [(f.check_id, f.path) for f in result.warnings] == [("S14", "skills/changelog-formatter/SKILL.md")]
 
 
 def test_s14_ignores_surrounding_whitespace(tmp_path):
@@ -324,3 +325,20 @@ def test_description_mentioning_todo_has_no_s14(tmp_path):
     write_hub(tmp_path)
     make_skill(tmp_path, text=_placeholder_skill('"TODO list manager. Use when the user asks to track tasks."'))
     assert "S14" not in ids(run_qa(tmp_path).findings)
+
+
+def test_s17_reserved_plugin_name_is_a_warning(tmp_path):
+    findings = run(tmp_path, skill_md("claude-helper"), dirname="claude-helper")
+    assert ids(findings) == ["S17"] and findings[0].level == "warning"
+    expected = "name passes for one of Anthropic's own plugins; Claude Code's plugin validator rejects it"
+    assert findings[0].message == expected
+
+
+def test_s5_lone_surrogate_description_is_an_error_without_echo(tmp_path):
+    escape = "\\" + "ud800"  # built by concatenation so no tool turns it into a character (L72)
+    text = skill_md().replace('description: "Formats', f'description: "bad {escape} Formats')
+    findings = run(tmp_path, text)
+    assert ids(findings) == ["S5"]
+    expected = "description contains a character that can't be written as UTF-8 (a lone surrogate escape?)"
+    assert findings[0].message == expected
+    assert "ud800" not in findings[0].message

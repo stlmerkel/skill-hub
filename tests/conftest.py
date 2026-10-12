@@ -1,6 +1,10 @@
 # tests/conftest.py
 from pathlib import Path
 
+from skill_hub.config import check_hub
+from skill_hub.manifests import render_manifests, write_manifests
+from skill_hub.skills import SKILLS_DIR
+
 GOOD_HUB = """\
 hub:
   name: acme-skills
@@ -46,7 +50,7 @@ def skill_md(
 
 
 def make_skill(root: Path, dirname: str = "changelog-formatter", text: str | None = None) -> Path:
-    skill_dir = root / "src" / dirname
+    skill_dir = root / SKILLS_DIR / dirname
     skill_dir.mkdir(parents=True, exist_ok=True)
     (skill_dir / "SKILL.md").write_text(skill_md(dirname) if text is None else text, encoding="utf-8")
     return skill_dir
@@ -61,3 +65,8 @@ def make_theme(root: Path, name: str = "theme", index: str = "<p>{{ catalog.hub.
     theme.mkdir(parents=True, exist_ok=True)
     (theme / "index.html.j2").write_text(index, encoding="utf-8")
     return theme
+
+
+def sync_manifests(root: Path) -> None:
+    """Write the hub's marketplace manifests, as `skill-hub manifests` does, so QA check R7 passes."""
+    write_manifests(root, render_manifests(root, check_hub(root)[1]))

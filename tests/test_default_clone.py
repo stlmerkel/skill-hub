@@ -1,6 +1,6 @@
 """Template self-test: the shipped defaults pass QA with only the H6 warnings.
 
-Runs on a committed snapshot, never on the adopter's live hub.yml or src/, so
+Runs on a committed snapshot, never on the adopter's live hub.yml or skills/, so
 renaming the hub or replacing the example cannot break this test. When the
 template's shipped defaults change, update the snapshot in the same commit.
 """

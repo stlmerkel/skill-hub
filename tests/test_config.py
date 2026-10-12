@@ -213,3 +213,22 @@ def test_h10_theme_cannot_be_the_hub_root(tmp_path):
     (tmp_path / "index.html.j2").write_text("x", encoding="utf-8")
     write_hub(tmp_path, site_hub('  theme: "."\n'))
     assert ids(check_hub(tmp_path)[0]) == ["H10"]
+
+
+def test_h11_reserved_hub_name_without_echo(tmp_path):
+    write_hub(tmp_path, GOOD_HUB.replace("name: acme-skills", "name: agent-skills"))
+    findings, config = check_hub(tmp_path)
+    assert ids(findings) == ["H11"] and config is None
+    assert "agent-skills" not in findings[0].message
+
+
+@pytest.mark.parametrize("key", ["owner", "description"])
+def test_h3_lone_surrogate_in_a_manifest_field_is_an_error_without_echo(tmp_path, key):
+    escape = "\\" + "ud800"  # built by concatenation so no tool turns it into a character (L72)
+    current = {"owner": "Acme Platform Team", "description": "Skills for Acme engineers."}[key]
+    write_hub(tmp_path, GOOD_HUB.replace(f"{key}: {current}", f'{key}: "bad {escape} value"'))
+    findings, config = check_hub(tmp_path)
+    assert ids(findings) == ["H3"] and config is None
+    expected = f"hub.{key} contains a character that can't be written as UTF-8 (a lone surrogate escape?)"
+    assert findings[0].message == expected
+    assert "ud800" not in findings[0].message

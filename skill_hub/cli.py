@@ -1,28 +1,47 @@
 # skill_hub/cli.py
-"""Command-line entry point: `skill-hub qa`, `skill-hub new-skill` and `skill-hub build`."""
+"""Command-line entry point: `skill-hub qa`, `skill-hub new-skill`, `skill-hub manifests` and `skill-hub build`."""
 
 import argparse
 import sys
 from pathlib import Path
 
 from skill_hub.catalog import BuildError
+from skill_hub.config import check_hub
+from skill_hub.manifests import MANIFEST_PATHS, ManifestError, render_manifests, write_manifests
 from skill_hub.qa import format_report, run_qa
 from skill_hub.releases import RELEASE_CONFIG
 from skill_hub.scaffold import ScaffoldError, create_skill
 from skill_hub.site import build_site
 
 
+def _update_manifests(root: Path) -> int:
+    """Regenerate both marketplace manifests and return the skill count. Raises ManifestError."""
+    result = run_qa(root)
+    blocking = len([f for f in result.errors if f.check_id != "R7"])
+    if blocking:
+        errors = "error" if blocking == 1 else "errors"
+        raise ManifestError(f"QA found {blocking} {errors}; run `skill-hub qa` and fix them first")
+    write_manifests(root, render_manifests(root, check_hub(root)[1]))
+    return result.skill_count
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="skill-hub", description="Tools for running a skill hub.")
     commands = parser.add_subparsers(dest="command", required=True)
-    qa = commands.add_parser("qa", help="validate hub.yml and every skill under src/")
-    qa.add_argument("--root", type=Path, default=Path("."), help="hub root containing hub.yml and src/ (default: .)")
+    qa = commands.add_parser("qa", help="validate hub.yml and every skill under skills/")
+    qa.add_argument("--root", type=Path, default=Path("."), help="hub root containing hub.yml and skills/ (default: .)")
     qa.add_argument("--strict", action="store_true", help="treat warnings as errors")
-    new_skill = commands.add_parser("new-skill", help="create a skill under src/ that passes QA")
+    new_skill = commands.add_parser("new-skill", help="create a skill under skills/ that passes QA")
     new_skill.add_argument("name", help="the skill's name: a-z, 0-9 and single hyphens")
     new_skill.add_argument("--root", type=Path, default=Path("."), help="hub root containing hub.yml (default: .)")
-    build = commands.add_parser("build", help="build the marketplace page and catalog.json from hub.yml and src/")
-    build.add_argument("--root", type=Path, default=Path("."), help="hub root containing hub.yml and src/ (default: .)")
+    manifests = commands.add_parser(
+        "manifests", help="write the marketplace manifests that list each skill for Claude Code and Cursor"
+    )
+    manifests.add_argument("--root", type=Path, default=Path("."), help="hub root containing hub.yml (default: .)")
+    build = commands.add_parser("build", help="build the marketplace page and catalog.json from hub.yml and skills/")
+    build.add_argument(
+        "--root", type=Path, default=Path("."), help="hub root containing hub.yml and skills/ (default: .)"
+    )
     build.add_argument("--out", type=Path, default=Path("site"), help="output folder (default: site)")
     args = parser.parse_args(argv)
 
@@ -38,6 +57,16 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Built the marketplace page for {result.skill_count} {skills} in {args.out}")
         return 0
 
+    if args.command == "manifests":
+        try:
+            count = _update_manifests(args.root)
+        except ManifestError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        skills = "skill" if count == 1 else "skills"
+        print(f"Wrote {MANIFEST_PATHS[0]} and {MANIFEST_PATHS[1]} for {count} {skills}")
+        return 0
+
     if args.command == "new-skill":
         try:
             created = create_skill(args.root, args.name)
@@ -48,6 +77,12 @@ def main(argv: list[str] | None = None) -> int:
         if not created.registered:
             print(f"Release registration skipped: no {RELEASE_CONFIG}")
         print("Next: replace the placeholder description and instructions, then run `uv run skill-hub qa`.")
+        try:
+            _update_manifests(args.root)
+        except ManifestError:
+            print("Manifests not updated: fix the QA errors, then run `skill-hub manifests`")
+        else:
+            print("Updated the marketplace manifests")
         return 0
 
     if hasattr(sys.stdout, "reconfigure"):

@@ -5,9 +5,9 @@ from pathlib import Path
 import pytest
 
 from skill_hub.catalog import BuildError
-from skill_hub.config import SiteSettings
+from skill_hub.config import SiteSettings, check_hub
 from skill_hub.site import MARKER_FILE, build_site, render_theme, write_site
-from tests.conftest import GOOD_HUB, make_skill, make_theme, skill_md, write_hub
+from tests.conftest import GOOD_HUB, make_skill, make_theme, skill_md, sync_manifests, write_hub
 
 CATALOG = {
     "schema_version": 1,
@@ -26,7 +26,7 @@ CATALOG = {
             "license": None,
             "compatibility": None,
             "links": {
-                "source": "https://github.com/acme/skills/tree/HEAD/src/alpha",
+                "source": "https://github.com/acme/skills/tree/HEAD/skills/alpha",
                 "changelog": None,
                 "release": None,
             },
@@ -166,6 +166,7 @@ def themed_hub(root, theme="theme"):
     make_theme(root, theme, index="{% for s in catalog.skills %}<p>{{ s.name }}</p>{% endfor %}\n")
     write_hub(root, GOOD_HUB + f'site:\n  theme: "{theme}"\n')
     make_skill(root)
+    sync_manifests(root)
     return root
 
 
@@ -285,12 +286,14 @@ def test_out_inside_the_theme_is_refused_and_nothing_is_created(tmp_path):
     assert entries(tmp_path) == ["theme"]
 
 
-def test_lone_surrogate_is_a_build_error_not_a_traceback(tmp_path):
+def test_lone_surrogate_is_a_build_error_not_a_traceback(tmp_path, monkeypatch):
+    # QA (S5 and R7) rejects this hub before the build, so the gate is patched out to reach the build's own guard
+    monkeypatch.setattr("skill_hub.site.require_clean_qa", lambda root: check_hub(root)[1])
     root = themed_hub(tmp_path / "hub")
     escape = "\\" + "ud800"  # built by concatenation so no tool turns it into a character (L72)
     text = skill_md().replace('description: "Formats', f'description: "{escape} Formats')
-    (root / "src" / "changelog-formatter" / "SKILL.md").write_text(text, encoding="utf-8")
-    with pytest.raises(BuildError):
+    (root / "skills" / "changelog-formatter" / "SKILL.md").write_text(text, encoding="utf-8")
+    with pytest.raises(BuildError, match=r"cannot be written as UTF-8"):
         build_site(root, tmp_path / "out")
     assert not (tmp_path / "out").exists()
     assert [p.name for p in tmp_path.iterdir()] == ["hub"]
