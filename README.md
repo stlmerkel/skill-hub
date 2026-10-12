@@ -30,7 +30,7 @@ uv run skill-hub qa
 
 A fresh clone passes with two warnings. They are reminders to make the hub yours:
 
-1. **Edit `hub.yml`.** Set `hub.name` (lowercase letters, digits and single hyphens), `display_name`, `owner`, `description` and `repo_url`. Every skill-hub command reads identity from this file and nowhere else.
+1. **Edit `hub.yml`.** Set `hub.name` (lowercase letters, digits and single hyphens), `display_name`, `owner`, `description` and `repo_url`. Every skill-hub command reads identity from this file and nowhere else. The name, owner and description also feed the marketplace manifests, so run `uv run skill-hub manifests` after editing them.
 2. **Replace the example skill.** `skills/example-skill/` shows the shape of a skill. Create your own with `uv run skill-hub new-skill <name>`, then delete the example once you have real skills. QA warns (S14) until you replace the new skill's placeholder description.
 3. **Run `uv run skill-hub qa` again.** With no warnings left, your hub is ready for skills.
 
@@ -79,7 +79,7 @@ The rules QA enforces:
 - **Version:** a quoted SemVer string in `metadata.version`. A top-level `version` key is not part of the spec and fails QA. Keep the `# x-release-please-version` marker on that line: Release Please bumps the version there.
 - **Secrets:** every file in a skill, hidden files included, is scanned for known token shapes and credential assignments. For a deliberate example in documentation, put `skill-hub: allow-secret` on that line.
 
-`skill-hub new-skill` refreshes the marketplace manifests. After you edit a skill's description, or add or remove a skill by hand, run `uv run skill-hub manifests`; QA (R7) fails until you do.
+`skill-hub new-skill` refreshes the marketplace manifests. After you edit a skill's description, change `name`, `owner` or `description` in `hub.yml`, or add or remove a skill by hand, run `uv run skill-hub manifests`; QA (R7) fails until you do.
 
 ## Releasing a skill
 
@@ -180,7 +180,7 @@ The generated commands on the marketplace page need `repo_url` to be a `https://
 |---|---|---|
 | H1 | `hub.yml` exists and is a regular file | error |
 | H2 | `hub.yml` is UTF-8, valid YAML (no duplicate or merge keys) and a mapping | error |
-| H3 | `hub.name`, `display_name`, `owner`, `description` and `repo_url` are filled in | error |
+| H3 | `hub.name`, `display_name`, `owner`, `description` and `repo_url` are filled in (`owner` and `description` can be written as UTF-8) | error |
 | H4 | `hub.name` uses lowercase letters, digits and single hyphens | error |
 | H5 | `qa` is a mapping and `qa.allow_keys` is a list of strings | error |
 | H6 | `hub.name` or `repo_url` is still the kit's default | warning |
@@ -193,7 +193,7 @@ The generated commands on the marketplace page need `repo_url` to be a `https://
 | S2 | `SKILL.md` is UTF-8 and opens with a `---` frontmatter block | error |
 | S3 | The frontmatter is valid YAML and a mapping | error |
 | S4 | `name` is valid and matches the folder | error |
-| S5 | `description` is present and at most 1024 characters | error |
+| S5 | `description` is present, at most 1024 characters and can be written as UTF-8 | error |
 | S6 | No top-level keys outside the spec (and `qa.allow_keys`) | error |
 | S7 | `metadata.version` is a quoted SemVer string | error |
 | S8 | `metadata`, `compatibility`, `license` and `allowed-tools` have the right types and lengths | error |
@@ -205,7 +205,7 @@ The generated commands on the marketplace page need `repo_url` to be a `https://
 | S14 | `description` is still the placeholder written by `skill-hub new-skill` | warning |
 | S15 | `metadata.version` matches the skill's manifest entry, and its `version.txt` if it has one | error |
 | S16 | A registered skill that has never been released has a `metadata.version` other than its first-release version (`initial-version`), which the first release would overwrite | warning |
-| S17 | The skill's name doesn't pass for one of Anthropic's own plugins (such as a `claude-` or `anthropic-` prefix), which Claude Code refuses | warning |
+| S17 | The skill's name doesn't pass for one of Anthropic's own plugins (such as a `claude-` or `anthropic-` prefix), which Claude Code's plugin validator rejects | warning |
 | R1 | `skills/` exists and can be read | error |
 | R2 | `skills/` holds at least one skill | error |
 | R3 | A loose file sits directly in `skills/` | warning |

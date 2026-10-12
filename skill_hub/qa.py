@@ -15,6 +15,7 @@ from skill_hub.contract import (
     SCAFFOLD_DESCRIPTION,
     SPEC_KEYS,
     is_blank,
+    is_utf8_encodable,
     is_reserved_plugin_name,
     is_valid_name,
     is_valid_semver,
@@ -170,7 +171,7 @@ def _check_fields(fm: dict, key_lines, dir_name: str, md: str, allow_keys: tuple
     elif name != dir_name:
         error("S4", f'name does not match directory "{dir_name}"')
     if isinstance(name, str) and is_valid_name(name) and is_reserved_plugin_name(name):
-        message = "name passes for one of Anthropic's own plugins; Claude Code refuses it as a plugin name"
+        message = "name passes for one of Anthropic's own plugins; Claude Code's plugin validator rejects it"
         findings.append(Finding(WARNING, "S17", md, message))
 
     # S5 description
@@ -183,6 +184,8 @@ def _check_fields(fm: dict, key_lines, dir_name: str, md: str, allow_keys: tuple
         error("S5", "description is empty")
     elif len(description) > DESCRIPTION_MAX:
         error("S5", f"description is {len(description)} characters; the limit is {DESCRIPTION_MAX}")
+    elif not is_utf8_encodable(description):
+        error("S5", "description contains a character that can't be written as UTF-8 (a lone surrogate escape?)")
 
     # S14 scaffold placeholder
     if isinstance(description, str) and description.strip() == SCAFFOLD_DESCRIPTION:

@@ -10,12 +10,13 @@ import subprocess
 from pathlib import Path
 
 from skill_hub.config import HUB_FILE
+from skill_hub.manifests import MANIFEST_PATHS
 from skill_hub.skills import SKILLS_DIR
 from skill_hub.releases import RELEASE_CONFIG, RELEASE_MANIFEST
 
 ROOT = Path(__file__).parent.parent
 BOM = b"\xef\xbb\xbf"
-ADOPTER_FILES = {HUB_FILE, RELEASE_CONFIG, RELEASE_MANIFEST}
+ADOPTER_FILES = {HUB_FILE, RELEASE_CONFIG, RELEASE_MANIFEST, *MANIFEST_PATHS}
 
 
 def test_no_literal_bom_in_tracked_files():

@@ -7,6 +7,7 @@ from skill_hub.contract import (
     DEFAULT_HUB_NAME,
     DEFAULT_REPO_URL,
     is_blank,
+    is_utf8_encodable,
     is_hex_colour,
     is_reserved_marketplace_name,
     is_safe_logo_url,
@@ -38,6 +39,9 @@ class HubConfig:
     repo_url: str
     allow_keys: tuple[str, ...]
     site: SiteSettings = SiteSettings()
+
+
+MANIFEST_KEYS = ("owner", "description")  # copied into the marketplace manifests, which are written as UTF-8
 
 
 def _error(check_id: str, message: str, line: int | None = None) -> Finding:
@@ -128,6 +132,9 @@ def check_hub(root: Path) -> tuple[list[Finding], HubConfig | None]:
                 findings.append(_error("H3", f"hub.{key} must be a string, found {type_name(value)}; quote it"))
             elif is_blank(value):
                 findings.append(_error("H3", f"hub.{key} is empty"))
+            elif key in MANIFEST_KEYS and not is_utf8_encodable(value):
+                message = f"hub.{key} contains a character that can't be written as UTF-8 (a lone surrogate escape?)"
+                findings.append(_error("H3", message))
         name = hub.get("name")
         if isinstance(name, str) and not is_blank(name) and not is_valid_name(name):
             findings.append(_error(

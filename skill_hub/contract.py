@@ -42,6 +42,15 @@ def is_blank(value: str) -> bool:
     return value.strip() == ""
 
 
+def is_utf8_encodable(value: str) -> bool:
+    """False for a string holding a lone surrogate, which cannot be written to a UTF-8 file."""
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
 def type_name(value: object) -> str:
     """Describe a YAML-produced value's type without echoing the value."""
     if value is None:

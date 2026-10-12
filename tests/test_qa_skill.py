@@ -330,3 +330,15 @@ def test_description_mentioning_todo_has_no_s14(tmp_path):
 def test_s17_reserved_plugin_name_is_a_warning(tmp_path):
     findings = run(tmp_path, skill_md("claude-helper"), dirname="claude-helper")
     assert ids(findings) == ["S17"] and findings[0].level == "warning"
+    expected = "name passes for one of Anthropic's own plugins; Claude Code's plugin validator rejects it"
+    assert findings[0].message == expected
+
+
+def test_s5_lone_surrogate_description_is_an_error_without_echo(tmp_path):
+    escape = "\\" + "ud800"  # built by concatenation so no tool turns it into a character (L72)
+    text = skill_md().replace('description: "Formats', f'description: "bad {escape} Formats')
+    findings = run(tmp_path, text)
+    assert ids(findings) == ["S5"]
+    expected = "description contains a character that can't be written as UTF-8 (a lone surrogate escape?)"
+    assert findings[0].message == expected
+    assert "ud800" not in findings[0].message

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from skill_hub.catalog import BuildError
-from skill_hub.config import SiteSettings
+from skill_hub.config import SiteSettings, check_hub
 from skill_hub.site import MARKER_FILE, build_site, render_theme, write_site
 from tests.conftest import GOOD_HUB, make_skill, make_theme, skill_md, sync_manifests, write_hub
 
@@ -287,8 +287,8 @@ def test_out_inside_the_theme_is_refused_and_nothing_is_created(tmp_path):
 
 
 def test_lone_surrogate_is_a_build_error_not_a_traceback(tmp_path, monkeypatch):
-    # R7 is patched out: the surrogate can never be written to a manifest, so R7 would fail QA before the build
-    monkeypatch.setattr("skill_hub.qa.check_manifests", lambda root, config: [])
+    # QA (S5 and R7) rejects this hub before the build, so the gate is patched out to reach the build's own guard
+    monkeypatch.setattr("skill_hub.site.require_clean_qa", lambda root: check_hub(root)[1])
     root = themed_hub(tmp_path / "hub")
     escape = "\\" + "ud800"  # built by concatenation so no tool turns it into a character (L72)
     text = skill_md().replace('description: "Formats', f'description: "{escape} Formats')
