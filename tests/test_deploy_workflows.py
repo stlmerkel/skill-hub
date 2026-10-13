@@ -133,3 +133,26 @@ def test_no_expression_inside_a_run_script(name):
     for job in load(name)["jobs"].values():
         for step in job.get("steps", []):
             assert "${{" not in step.get("run", ""), step.get("name", step.get("run"))
+
+
+def rsync_run() -> str:
+    (step,) = [step for step in deploy_job("rsync")["steps"] if "rsync " in step.get("run", "")]
+    return step["run"]
+
+
+def test_rsync_step_verifies_the_host_and_never_prompts():
+    run = rsync_run()
+    assert "StrictHostKeyChecking=yes" in run
+    assert "BatchMode=yes" in run
+
+
+@pytest.mark.parametrize("target", TARGETS)
+def test_no_run_script_scans_for_host_keys(target):
+    for step in deploy_job(target)["steps"]:
+        assert "ssh-keyscan" not in step.get("run", ""), step.get("name")
+
+
+@pytest.mark.parametrize("target", TARGETS)
+def test_no_step_overrides_path_or_user(target):
+    for step in deploy_job(target)["steps"]:
+        assert not {"PATH", "USER"} & set(step.get("env") or {}), step.get("name")

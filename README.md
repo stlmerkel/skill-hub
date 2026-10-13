@@ -160,9 +160,9 @@ Each target is one workflow file, `.github/workflows/deploy-<target>.yml`, calle
 
 | Target | Settings in `hub.yml` | Actions secrets | One-time setup |
 |---|---|---|---|
-| `github-pages` | none | none | Under **Settings > Pages**, set **Source** to **GitHub Actions** |
+| `github-pages` | none | none | Under **Settings → Pages**, set **Source** to **GitHub Actions** |
 | `s3` | `bucket` and `region`, plus `endpoint` for anything other than AWS | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | A bucket served as a static site (directly or behind a CDN) and a key that can write to it. For Cloudflare R2, set `endpoint` to `https://<account-id>.r2.cloudflarestorage.com` and `region` to `auto` |
-| `rsync` | `host`, `user` and `path`, plus `port` if it isn't 22 | `DEPLOY_SSH_KEY` (a private key), `DEPLOY_SSH_KNOWN_HOSTS` (the server's line from `ssh-keyscan -p <port> <host>`, after you check its fingerprint; with a port other than 22 the line starts `[host]:port`) | A web server that serves `path`, with the key's public half in the user's `authorized_keys` |
+| `rsync` | `host`, `user` and `path`, plus `port` if it isn't 22 | `DEPLOY_SSH_KEY` (a private key), `DEPLOY_SSH_KNOWN_HOSTS` (the server's lines from `ssh-keyscan -p <port> <host>` (one per key type), after you check their fingerprints; with a port other than 22 each line starts `[host]:port`) | A web server that serves `path`, with the key's public half in the user's `authorized_keys` |
 
 The `s3` and `rsync` targets delete anything at the destination that isn't in the build, so point them at a bucket or folder that holds only the marketplace page.
 
@@ -236,7 +236,7 @@ The generated commands on the marketplace page need `repo_url` to be a `https://
 | H12 | `deploy` is a mapping and `deploy.target` is empty or a name of a-z, 0-9 and single hyphens (an unknown key under `deploy` is a warning) | error |
 | H13 | `deploy.s3` and `deploy.rsync` are mappings, their settings are strings, and `port` is a number (an unknown key in either is a warning) | error |
 | H14 | The chosen target has its required settings: `s3` needs `bucket` and `region`; `rsync` needs `host`, `user` and `path` | error |
-| H15 | Every filled-in deploy setting, for any target, has a safe value (such as a valid bucket name, an `https://` endpoint, or a path with no shell characters) | error |
+| H15 | Every filled-in deploy setting, for any target, has a safe value (such as a valid bucket name, an `https://` endpoint, or a path with no shell characters that names a folder below `/` or `~`) | error |
 | H16 | A non-empty `deploy.target` has a matching `.github/workflows/deploy-<target>.yml` | error |
 | S1 | The skill has a `SKILL.md` | error |
 | S2 | `SKILL.md` is UTF-8 and opens with a `---` frontmatter block | error |

@@ -178,11 +178,13 @@ def is_valid_ssh_user(value: str) -> bool:
 
 
 def is_valid_deploy_path(value: str) -> bool:
-    return (
-        _DEPLOY_PATH_RE.fullmatch(value) is not None
-        and not value.startswith("-")
-        and ".." not in value.split("/")
-    )
+    if _DEPLOY_PATH_RE.fullmatch(value) is None or value.startswith("-"):
+        return False
+    segments = value.split("/")
+    if ".." in segments:
+        return False
+    named = [segment for segment in segments if segment not in ("", ".")]
+    return bool(named) and not (len(named) == 1 and named[0].startswith("~"))
 
 
 def is_valid_port(value: object) -> bool:
@@ -206,7 +208,8 @@ DEPLOY_SETTING_RULES: dict[tuple[str, str], tuple[Callable[[object], bool], str]
     ),
     ("rsync", "path"): (
         is_valid_deploy_path,
-        "must use only letters, digits and . _ ~ / + -, must not start with - and must not contain a .. segment",
+        "must use only letters, digits and . _ ~ / + -, must not start with - or contain a .. segment, "
+        "and must name a folder below / or ~",
     ),
     ("rsync", "port"): (is_valid_port, "must be a number from 1 to 65535"),
 }

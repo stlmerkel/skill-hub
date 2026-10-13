@@ -65,5 +65,5 @@ jobs:
           PORT: ${{ inputs.port }}
         run: |
           rsync -az --delete \
-            -e "ssh -p $PORT -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
+            -e "ssh -p $PORT -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes" \
             site/ "$REMOTE_USER@$HOST:$DEST/"
