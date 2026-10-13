@@ -189,6 +189,11 @@ The generated commands on the marketplace page need `repo_url` to be a `https://
 | H9 | `site.logo_url` is an `https://` URL or a relative path | error |
 | H10 | `site.theme` is a folder inside the hub root that contains `index.html.j2` | error |
 | H11 | `hub.name` is not a marketplace name Claude Code reserves (such as `agent-skills`, `github` or anything starting `claudeai-`) | error |
+| H12 | `deploy` is a mapping and `deploy.target` is empty or a name of a-z, 0-9 and single hyphens (an unknown key under `deploy` is a warning) | error |
+| H13 | `deploy.s3` and `deploy.rsync` are mappings, their settings are strings, and `port` is a number (an unknown key in either is a warning) | error |
+| H14 | The chosen target has its required settings: `s3` needs `bucket` and `region`; `rsync` needs `host`, `user` and `path` | error |
+| H15 | Every filled-in deploy setting, for any target, has a safe value (such as a valid bucket name, an `https://` endpoint, or a path with no shell characters) | error |
+| H16 | A non-empty `deploy.target` has a matching `.github/workflows/deploy-<target>.yml` | error |
 | S1 | The skill has a `SKILL.md` | error |
 | S2 | `SKILL.md` is UTF-8 and opens with a `---` frontmatter block | error |
 | S3 | The frontmatter is valid YAML and a mapping | error |

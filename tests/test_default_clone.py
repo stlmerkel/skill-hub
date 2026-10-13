@@ -7,6 +7,8 @@ template's shipped defaults change, update the snapshot in the same commit.
 
 from pathlib import Path
 
+from skill_hub.config import check_hub
+from skill_hub.deploy import DeploySettings
 from skill_hub.qa import run_qa
 
 SNAPSHOT = Path(__file__).parent / "fixtures" / "default-clone"
@@ -23,3 +25,7 @@ def test_default_clone_builds(tmp_path):
     from skill_hub.site import build_site
 
     assert build_site(SNAPSHOT, tmp_path / "out").skill_count == 1
+
+
+def test_default_clone_never_deploys():
+    assert check_hub(SNAPSHOT)[1].deploy == DeploySettings()

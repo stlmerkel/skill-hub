@@ -18,3 +18,18 @@ site:
   accent: ""     # hex colour for links and highlights, e.g. "#4f46e5"; empty = the theme's default
   logo_url: ""   # https:// URL or a path relative to the page; empty = no logo
   theme: ""      # your theme folder, relative to this file; empty = the built-in default
+
+deploy:
+  # Where CI publishes the marketplace page on every push to main. Empty = never deploy.
+  # Built in: github-pages, s3, rsync. See "Deploying the marketplace page" in the README.
+  # Keys and SSH keys go in your repository's Actions secrets, never in this file.
+  target: ""
+  s3:
+    bucket: ""
+    endpoint: ""   # empty = AWS; set for R2, MinIO or B2, e.g. "https://<account-id>.r2.cloudflarestorage.com"
+    region: ""     # e.g. "us-east-1"; R2 uses "auto"
+  rsync:
+    host: ""
+    user: ""
+    path: ""       # the folder on the server, e.g. "/var/www/skills"
+    port: 22

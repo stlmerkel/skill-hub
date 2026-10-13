@@ -70,3 +70,31 @@ def make_theme(root: Path, name: str = "theme", index: str = "<p>{{ catalog.hub.
 def sync_manifests(root: Path) -> None:
     """Write the hub's marketplace manifests, as `skill-hub manifests` does, so QA check R7 passes."""
     write_manifests(root, render_manifests(root, check_hub(root)[1]))
+
+
+S3_DEPLOY = """\
+deploy:
+  target: s3
+  s3:
+    bucket: acme-skills
+    endpoint: ""
+    region: us-east-1
+"""
+
+RSYNC_DEPLOY = """\
+deploy:
+  target: rsync
+  rsync:
+    host: web1.example.com
+    user: deploy
+    path: /var/www/skills
+"""
+
+
+def make_deploy_workflow(root: Path, target: str) -> Path:
+    """A stand-in .github/workflows/deploy-<target>.yml, so QA check H16 finds the target's workflow."""
+    folder = root / ".github" / "workflows"
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"deploy-{target}.yml"
+    path.write_text("on: workflow_call\n", encoding="utf-8")
+    return path
