@@ -145,3 +145,9 @@ def check_deploy(root: Path, data: dict) -> tuple[list[Finding], DeploySettings]
     if any(finding.level == ERROR for finding in findings):
         return findings, DeploySettings()
     return findings, DeploySettings(target, _outputs(target, blocks.get(target, {})))
+
+
+def render_outputs(settings: DeploySettings) -> str:
+    """The `name=value` lines `skill-hub deploy-config` writes to $GITHUB_OUTPUT: the target, then its settings."""
+    lines = [f"target={settings.target}", *(f"{name}={value}" for name, value in settings.outputs)]
+    return "\n".join(lines) + "\n"

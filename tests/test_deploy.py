@@ -1,7 +1,7 @@
 import pytest
 
 from skill_hub.config import check_hub
-from skill_hub.deploy import DeploySettings
+from skill_hub.deploy import DeploySettings, render_outputs
 from skill_hub.findings import WARNING
 from tests.conftest import GOOD_HUB, RSYNC_DEPLOY, S3_DEPLOY, ids, make_deploy_workflow, write_hub
 
@@ -170,3 +170,9 @@ def test_only_the_selected_targets_settings_are_output(tmp_path):
     findings, config = check(tmp_path, block, "rsync")
     assert findings == []
     assert all(name.startswith("rsync_") for name, _ in config.deploy.outputs)
+
+
+def test_render_outputs():
+    assert render_outputs(DeploySettings()) == "target=\n"
+    settings = DeploySettings("s3", (("s3_bucket", "acme-skills"), ("s3_region", "us-east-1")))
+    assert render_outputs(settings) == "target=s3\ns3_bucket=acme-skills\ns3_region=us-east-1\n"
