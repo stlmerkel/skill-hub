@@ -6,6 +6,7 @@ from pathlib import Path
 from skill_hub.contract import (
     DEFAULT_HUB_NAME,
     DEFAULT_REPO_URL,
+    HUB_FILE,
     is_blank,
     is_utf8_encodable,
     is_hex_colour,
@@ -17,7 +18,6 @@ from skill_hub.contract import (
 from skill_hub.findings import ERROR, WARNING, Finding
 from skill_hub.yamlutil import load_yaml
 
-HUB_FILE = "hub.yml"
 REQUIRED_HUB_KEYS = ("name", "display_name", "owner", "description", "repo_url")
 SITE_KEYS = ("accent", "logo_url", "theme")
 THEME_ENTRY = "index.html.j2"

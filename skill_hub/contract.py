@@ -1,5 +1,6 @@
 """The skill and hub contract: constants and pure rules shared by every check."""
 
+from collections.abc import Callable
 import datetime
 import re
 
@@ -12,6 +13,8 @@ SPEC_KEYS = frozenset({"name", "description", "license", "compatibility", "metad
 
 DEFAULT_HUB_NAME = "my-skill-hub"
 DEFAULT_REPO_URL = "https://github.com/you/your-hub"
+
+HUB_FILE = "hub.yml"
 
 # Written by `skill-hub new-skill` and flagged by QA check S14 until replaced.
 SCAFFOLD_DESCRIPTION = "TODO: say what this skill does and when an agent should use it."
@@ -133,3 +136,77 @@ def github_repo(repo_url: str) -> str | None:
     if match is None or match[2] in {".", ".."}:
         return None
     return f"{match[1]}/{match[2]}"
+
+# Deploy targets the kit ships a workflow for, and the hub.yml settings each one reads (deploy.<target>.<key>).
+DEPLOY_TARGET_SETTINGS = {
+    "github-pages": (),
+    "s3": ("bucket", "endpoint", "region"),
+    "rsync": ("host", "user", "path", "port"),
+}
+REQUIRED_DEPLOY_SETTINGS = {"s3": ("bucket", "region"), "rsync": ("host", "user", "path")}
+DEFAULT_RSYNC_PORT = 22
+
+# Allow-lists, not deny-lists: these values reach a shell on a runner that holds deploy secrets,
+# and become `name=value` lines in $GITHUB_OUTPUT, so a newline or shell metacharacter must never pass.
+_HOST_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+_HOST_RE = re.compile(rf"{_HOST_LABEL}(?:\.{_HOST_LABEL})*", re.ASCII)
+_ENDPOINT_RE = re.compile(rf"https://{_HOST_LABEL}(?:\.{_HOST_LABEL})*(?::[0-9]{{1,5}})?/?", re.ASCII)
+_BUCKET_RE = re.compile(r"[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]", re.ASCII)
+_REGION_RE = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*", re.ASCII)
+_SSH_USER_RE = re.compile(r"[a-z_][a-z0-9_-]{0,31}", re.ASCII)
+_DEPLOY_PATH_RE = re.compile(r"[A-Za-z0-9._~/+-]+", re.ASCII)
+
+
+def is_valid_bucket(value: str) -> bool:
+    return _BUCKET_RE.fullmatch(value) is not None and ".." not in value
+
+
+def is_valid_endpoint(value: str) -> bool:
+    return _ENDPOINT_RE.fullmatch(value) is not None
+
+
+def is_valid_region(value: str) -> bool:
+    return _REGION_RE.fullmatch(value) is not None
+
+
+def is_valid_host(value: str) -> bool:
+    return len(value) <= 253 and _HOST_RE.fullmatch(value) is not None
+
+
+def is_valid_ssh_user(value: str) -> bool:
+    return _SSH_USER_RE.fullmatch(value) is not None
+
+
+def is_valid_deploy_path(value: str) -> bool:
+    return (
+        _DEPLOY_PATH_RE.fullmatch(value) is not None
+        and not value.startswith("-")
+        and ".." not in value.split("/")
+    )
+
+
+def is_valid_port(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and 1 <= value <= 65535
+
+
+DEPLOY_SETTING_RULES: dict[tuple[str, str], tuple[Callable[[object], bool], str]] = {
+    ("s3", "bucket"): (
+        is_valid_bucket,
+        "must be 3-63 characters of a-z, 0-9, dots and hyphens, starting and ending with a letter or digit",
+    ),
+    ("s3", "endpoint"): (
+        is_valid_endpoint,
+        "must be an https:// URL with only a host and an optional port, such as https://minio.example.com:9000",
+    ),
+    ("s3", "region"): (is_valid_region, "must be lowercase letters, digits and single hyphens, such as us-east-1"),
+    ("rsync", "host"): (is_valid_host, "must be a hostname or an IPv4 address"),
+    ("rsync", "user"): (
+        is_valid_ssh_user,
+        "must be 1-32 characters of a-z, 0-9, _ and -, starting with a letter or _",
+    ),
+    ("rsync", "path"): (
+        is_valid_deploy_path,
+        "must use only letters, digits and . _ ~ / + -, must not start with - and must not contain a .. segment",
+    ),
+    ("rsync", "port"): (is_valid_port, "must be a number from 1 to 65535"),
+}
