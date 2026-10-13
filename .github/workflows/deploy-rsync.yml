@@ -1,0 +1,69 @@
+name: Deploy to a server over rsync
+
+# Called from qa.yml when hub.yml sets deploy.target: rsync. Copy this file as the model
+# for your own deploy target (see "Your own deploy target" in the README).
+on:
+  workflow_call:
+    inputs:
+      host:
+        type: string
+        required: true
+      user:
+        type: string
+        required: true
+      path:
+        type: string
+        required: true
+      port:
+        type: string
+        default: "22"
+    secrets:
+      DEPLOY_SSH_KEY:
+        required: true
+      DEPLOY_SSH_KNOWN_HOSTS:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions: {}
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      - name: Check the deploy secrets are set
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+        run: |
+          missing=0
+          for name in DEPLOY_SSH_KEY DEPLOY_SSH_KNOWN_HOSTS; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not set; add it under Settings > Secrets and variables > Actions"
+              missing=1
+            fi
+          done
+          exit "$missing"
+      - uses: actions/download-artifact@v8
+        with:
+          name: marketplace-page
+          path: site/
+      - name: Install the SSH key and known hosts
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          (umask 077 && printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key)
+          printf '%s\n' "$DEPLOY_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      # PATH and USER already mean something to the shell, so the inputs arrive as DEST and REMOTE_USER.
+      - name: Rsync the marketplace page to the server
+        env:
+          HOST: ${{ inputs.host }}
+          REMOTE_USER: ${{ inputs.user }}
+          DEST: ${{ inputs.path }}
+          PORT: ${{ inputs.port }}
+        run: |
+          rsync -az --delete \
+            -e "ssh -p $PORT -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
+            site/ "$REMOTE_USER@$HOST:$DEST/"
