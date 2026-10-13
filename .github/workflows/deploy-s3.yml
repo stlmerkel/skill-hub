@@ -1,0 +1,60 @@
+name: Deploy to an S3-compatible bucket
+
+# Called from qa.yml when hub.yml sets deploy.target: s3. Works with AWS S3, and with
+# Cloudflare R2, MinIO or Backblaze B2 when deploy.s3.endpoint is set.
+on:
+  workflow_call:
+    inputs:
+      bucket:
+        type: string
+        required: true
+      endpoint:
+        type: string
+        default: ""
+      region:
+        type: string
+        required: true
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions: {}
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      - name: Check the deploy secrets are set
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          missing=0
+          for name in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not set; add it under Settings > Secrets and variables > Actions"
+              missing=1
+            fi
+          done
+          exit "$missing"
+      - uses: actions/download-artifact@v8
+        with:
+          name: marketplace-page
+          path: site/
+      - name: Sync the marketplace page to the bucket
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ inputs.region }}
+          BUCKET: ${{ inputs.bucket }}
+          ENDPOINT: ${{ inputs.endpoint }}
+        run: |
+          set -- site/ "s3://$BUCKET" --delete
+          if [ -n "$ENDPOINT" ]; then
+            set -- "$@" --endpoint-url "$ENDPOINT"
+          fi
+          aws s3 sync "$@"

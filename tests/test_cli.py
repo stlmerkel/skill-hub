@@ -8,7 +8,16 @@ from skill_hub.cli import main
 from skill_hub.findings import WARNING, Finding
 from skill_hub.manifests import MANIFEST_PATHS, ManifestError
 from skill_hub.qa import QaResult, run_qa
-from tests.conftest import GOOD_HUB, make_skill, skill_md, sync_manifests, write_hub
+from tests.conftest import (
+    GOOD_HUB,
+    RSYNC_DEPLOY,
+    S3_DEPLOY,
+    make_deploy_workflow,
+    make_skill,
+    skill_md,
+    sync_manifests,
+    write_hub,
+)
 
 SECRET = "AKIA" + "Q" * 16
 LOWER = "sk" + "-" + "a1" * 12  # lowercase, so it is a valid skill name
@@ -239,3 +248,53 @@ def test_new_skill_with_other_qa_errors_creates_and_hints(tmp_path, capsys):
     assert out[-1] == "Manifests not updated: fix the QA errors, then run `skill-hub manifests`"
     assert (tmp_path / "skills" / "pdf-tidy" / "SKILL.md").is_file()
     assert not (tmp_path / MANIFEST_PATHS[0]).exists()
+
+
+S3_OUTPUT = "target=s3\ns3_bucket=acme-skills\ns3_region=us-east-1\n"
+
+
+def test_deploy_config_prints_the_outputs(tmp_path, capsys):
+    write_hub(tmp_path, GOOD_HUB + S3_DEPLOY)
+    make_deploy_workflow(tmp_path, "s3")
+    assert main(["deploy-config", "--root", str(tmp_path)]) == 0
+    assert capsys.readouterr().out == S3_OUTPUT
+
+
+def test_deploy_config_appends_to_github_output(tmp_path, monkeypatch, capsys):
+    write_hub(tmp_path, GOOD_HUB + S3_DEPLOY)
+    make_deploy_workflow(tmp_path, "s3")
+    output = tmp_path / "github-output"
+    output.write_text("earlier=1\n", encoding="utf-8")
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    assert main(["deploy-config", "--root", str(tmp_path), "--github-output"]) == 0
+    assert output.read_text(encoding="utf-8") == "earlier=1\n" + S3_OUTPUT
+    assert capsys.readouterr().out == "Deploy target: s3\n"
+
+
+def test_deploy_config_without_a_target(tmp_path, monkeypatch, capsys):
+    write_hub(tmp_path)
+    output = tmp_path / "github-output"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    assert main(["deploy-config", "--root", str(tmp_path), "--github-output"]) == 0
+    assert output.read_text(encoding="utf-8") == "target=\n"
+    assert capsys.readouterr().out == "No deploy target set; the deploy jobs will be skipped\n"
+
+
+def test_deploy_config_refuses_an_invalid_hub(tmp_path, monkeypatch, capsys):
+    write_hub(tmp_path, GOOD_HUB + RSYNC_DEPLOY.replace("path: /var/www/skills", "path: '/var/www;id'"))
+    make_deploy_workflow(tmp_path, "rsync")
+    output = tmp_path / "github-output"
+    output.write_text("earlier=1\n", encoding="utf-8")
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    assert main(["deploy-config", "--root", str(tmp_path), "--github-output"]) == 1
+    assert output.read_text(encoding="utf-8") == "earlier=1\n"
+    captured = capsys.readouterr()
+    assert captured.out == "" and ";id" not in captured.err
+    assert "skill-hub qa" in captured.err
+
+
+def test_deploy_config_needs_github_output_set(tmp_path, monkeypatch, capsys):
+    write_hub(tmp_path)
+    monkeypatch.delenv("GITHUB_OUTPUT", raising=False)
+    assert main(["deploy-config", "--root", str(tmp_path), "--github-output"]) == 1
+    assert "GITHUB_OUTPUT" in capsys.readouterr().err

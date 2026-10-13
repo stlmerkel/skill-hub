@@ -1,12 +1,15 @@
 # skill_hub/cli.py
-"""Command-line entry point: `skill-hub qa`, `skill-hub new-skill`, `skill-hub manifests` and `skill-hub build`."""
+"""Command-line entry point: `skill-hub qa`, `skill-hub new-skill`, `skill-hub manifests`, `skill-hub build`
+and `skill-hub deploy-config`."""
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
 from skill_hub.catalog import BuildError
 from skill_hub.config import check_hub
+from skill_hub.deploy import render_outputs
 from skill_hub.manifests import MANIFEST_PATHS, ManifestError, render_manifests, write_manifests
 from skill_hub.qa import format_report, run_qa
 from skill_hub.releases import RELEASE_CONFIG
@@ -43,7 +46,33 @@ def main(argv: list[str] | None = None) -> int:
         "--root", type=Path, default=Path("."), help="hub root containing hub.yml and skills/ (default: .)"
     )
     build.add_argument("--out", type=Path, default=Path("site"), help="output folder (default: site)")
+    deploy_config = commands.add_parser(
+        "deploy-config", help="print hub.yml's deploy target and its settings, as the deploy workflows read them"
+    )
+    deploy_config.add_argument("--root", type=Path, default=Path("."), help="hub root containing hub.yml (default: .)")
+    deploy_config.add_argument(
+        "--github-output", action="store_true", help="append to the file named by $GITHUB_OUTPUT instead of printing"
+    )
     args = parser.parse_args(argv)
+
+    if args.command == "deploy-config":
+        config = check_hub(args.root)[1]
+        if config is None:
+            print("error: hub.yml has QA errors; run `skill-hub qa` and fix them first", file=sys.stderr)
+            return 1
+        text = render_outputs(config.deploy)
+        if not args.github_output:
+            print(text, end="")
+            return 0
+        output = os.environ.get("GITHUB_OUTPUT")
+        if not output:
+            print("error: GITHUB_OUTPUT is not set; --github-output only works inside GitHub Actions", file=sys.stderr)
+            return 1
+        with open(output, "a", encoding="utf-8") as file:
+            file.write(text)
+        target = config.deploy.target
+        print(f"Deploy target: {target}" if target else "No deploy target set; the deploy jobs will be skipped")
+        return 0
 
     if args.command == "build":
         try:

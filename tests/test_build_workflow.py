@@ -20,12 +20,14 @@ def test_runs_after_qa_on_pushes_to_main_only():
 def test_builds_and_uploads_the_site_with_a_pinned_action():
     steps = build_job()["steps"]
     assert {"run": "uv run --locked skill-hub build"} in steps
+    assert {"id": "deploy", "run": "uv run --locked skill-hub deploy-config --github-output"} in steps
     (upload,) = [step for step in steps if step.get("uses", "").startswith("actions/upload-artifact")]
     assert upload["uses"] == "actions/upload-artifact@v7"
     assert upload["with"] == {"name": "marketplace-page", "path": "site/", "if-no-files-found": "error"}
 
 
-def test_workflow_stays_read_only():
+def test_only_the_pages_deploy_widens_permissions():
     workflow = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
     assert workflow["permissions"] == {"contents": "read"}
-    assert "permissions" not in workflow["jobs"]["build"]
+    widened = {name for name, job in workflow["jobs"].items() if job.get("permissions", {}) != {}}
+    assert widened == {"deploy-github-pages"}

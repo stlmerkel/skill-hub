@@ -4,7 +4,7 @@ A starter kit for standing up your own agent-skill marketplace. Clone it, set yo
 
 skill-hub is not a marketplace itself. It is the scaffolding for yours: everything that identifies your hub lives in one config file, and the skills are yours.
 
-> **Work in progress.** The skill contract, the QA guard, skill scaffolding, releases, the marketplace page build and client install paths work today. Deploying the page is next; see [Roadmap](#roadmap).
+> **Work in progress.** The skill contract, the QA guard, skill scaffolding, releases, the marketplace page build, client install paths and deploying the page work today.
 
 ## What you get
 
@@ -15,6 +15,7 @@ skill-hub is not a marketplace itself. It is the scaffolding for yours: everythi
 | **Semantic releases** | Conventional commits (`feat:`, `fix:`) drive version bumps and changelogs through [Release Please](https://github.com/googleapis/release-please), one version per skill | Available |
 | **Marketplace page** | `skill-hub build` turns your skills into a static, self-contained page and a `catalog.json`, restyled from `hub.yml` or replaced by your own theme. Host it anywhere | Available |
 | **Client install paths** | Every skill installs into Claude Code, GitHub Copilot or Cursor by one documented command, from manifests `skill-hub manifests` generates from `hub.yml` | Available |
+| **Deploy** | On every push to `main`, CI publishes the marketplace page to the deploy target `hub.yml` names: GitHub Pages, an S3-compatible bucket or your own server over rsync. Add your own target with one workflow file | Available |
 | **Skill scaffolding** | `skill-hub new-skill <name>` creates a skill that already passes QA | Available |
 
 ## Quick start
@@ -44,7 +45,8 @@ skill_hub/                 the QA tool (part of the kit)
 skill_hub/themes/default/  the built-in marketplace theme (copy it to make your own)
 site/                      build output from skill-hub build (git-ignored)
 tests/                     the kit's own tests
-.github/workflows/qa.yml   runs tests and skill-hub qa on every pull request
+.github/workflows/qa.yml   runs tests and skill-hub qa on every pull request; builds and deploys on main
+.github/workflows/deploy-*.yml  publish the marketplace page to the deploy target in hub.yml
 .github/workflows/release.yml  opens release PRs and tags skill releases
 release-please-config.json     which skills Release Please versions (skill-hub new-skill adds to it)
 .release-please-manifest.json  each skill's last released version (Release Please maintains it)
@@ -99,7 +101,7 @@ Before your first release:
 
 ## Marketplace page
 
-`uv run skill-hub build` checks the hub with QA, then writes the marketplace page into `site/`: an `index.html` with a card for every skill and a search box, plus `catalog.json`. Any QA error stops the build; warnings don't. Upload the folder to any static host. CI builds it on every push to `main` and attaches it to the workflow run as the `marketplace-page` artifact. Use `--out PATH` to write elsewhere. The build only replaces a folder it created itself, so it refuses to write into a folder that holds anything else.
+`uv run skill-hub build` checks the hub with QA, then writes the marketplace page into `site/`: an `index.html` with a card for every skill and a search box, plus `catalog.json`. Any QA error stops the build; warnings don't. Upload the folder to any static host, or let CI publish it (see [Deploying the marketplace page](#deploying-the-marketplace-page)). CI builds it on every push to `main` and attaches it to the workflow run as the `marketplace-page` artifact. Use `--out PATH` to write elsewhere. The build only replaces a folder it created itself, so it refuses to write into a folder that holds anything else.
 
 Restyle the default page from `hub.yml`:
 
@@ -140,6 +142,48 @@ A theme is a folder with an `index.html.j2` [Jinja2](https://jinja.palletsprojec
 - The template receives `catalog` (the data in `catalog.json`) and `site` (`accent` and `logo_url` from `hub.yml`).
 - Every value is HTML-escaped automatically, so skill text can't inject markup. An undefined variable fails the build with the file and line, instead of rendering blank.
 - A theme can't contain its own `index.html` or `catalog.json`, and it must sit inside the hub.
+
+## Deploying the marketplace page
+
+On every push to `main`, CI builds the marketplace page and publishes it to the deploy target `hub.yml` names. Pull requests never deploy. A new hub starts with `target: ""`, so its deploy jobs show as skipped and the run stays green until you pick one.
+
+```yaml
+deploy:
+  target: s3              # "", github-pages, s3, rsync, or your own
+  s3:
+    bucket: "acme-skills"
+    endpoint: ""          # empty = AWS; set for R2, MinIO or B2
+    region: "us-east-1"
+```
+
+Each target is one workflow file, `.github/workflows/deploy-<target>.yml`, called from a short job in `qa.yml`. Every deploy ships the exact `marketplace-page` artifact the build job produced, and each job receives only its own target's secrets. QA checks the `deploy:` block (H12 to H16) without printing its values, and `uv run skill-hub deploy-config` prints what CI will pass to the deploy job.
+
+| Target | Settings in `hub.yml` | Actions secrets | One-time setup |
+|---|---|---|---|
+| `github-pages` | none | none | Under **Settings → Pages**, set **Source** to **GitHub Actions** |
+| `s3` | `bucket` and `region`, plus `endpoint` for anything other than AWS | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | A bucket served as a static site (directly or behind a CDN) and a key that can write to it. For Cloudflare R2, set `endpoint` to `https://<account-id>.r2.cloudflarestorage.com` and `region` to `auto` |
+| `rsync` | `host`, `user` and `path`, plus `port` if it isn't 22 | `DEPLOY_SSH_KEY` (a private key), `DEPLOY_SSH_KNOWN_HOSTS` (the server's lines from `ssh-keyscan -p <port> <host>` (one per key type), after you check their fingerprints; with a port other than 22 each line starts `[host]:port`) | A web server that serves `path`, with the key's public half in the user's `authorized_keys` |
+
+The `s3` and `rsync` targets delete anything at the destination that isn't in the build, so point them at a bucket or folder that holds only the marketplace page.
+
+You don't need to remove the targets you don't use: their jobs are skipped. If you do remove one, delete its workflow file and its job in `qa.yml` together, because GitHub rejects the whole workflow when a job calls a file that doesn't exist.
+
+### Your own deploy target
+
+1. Copy `.github/workflows/deploy-rsync.yml` to `deploy-<name>.yml` and change its inputs, secrets and deploy step.
+2. Copy the `deploy-rsync` job in `qa.yml`, rename it, and change its `if:` to `needs.build.outputs.target == '<name>'`, its `uses:` path, its `with:` values (write your target's settings there) and its `secrets:`.
+3. Set `deploy.target: <name>` in `hub.yml`.
+
+QA checks that the workflow file exists, but not the settings a custom target reads. Your edit to `qa.yml` is the one change to a kit-owned file, so expect to merge it when you pull kit updates.
+
+### Previewing locally
+
+```bash
+uv run skill-hub build
+python -m http.server -d site
+```
+
+Then open http://localhost:8000.
 
 ## Installing skills
 
@@ -189,6 +233,11 @@ The generated commands on the marketplace page need `repo_url` to be a `https://
 | H9 | `site.logo_url` is an `https://` URL or a relative path | error |
 | H10 | `site.theme` is a folder inside the hub root that contains `index.html.j2` | error |
 | H11 | `hub.name` is not a marketplace name Claude Code reserves (such as `agent-skills`, `github` or anything starting `claudeai-`) | error |
+| H12 | `deploy` is a mapping and `deploy.target` is empty or a name of a-z, 0-9 and single hyphens (an unknown key under `deploy` is a warning) | error |
+| H13 | `deploy.s3` and `deploy.rsync` are mappings, their settings are strings, and `port` is a number (an unknown key in either is a warning) | error |
+| H14 | The chosen target has its required settings: `s3` needs `bucket` and `region`; `rsync` needs `host`, `user` and `path` | error |
+| H15 | Every filled-in deploy setting, for any target, has a safe value (such as a valid bucket name, an `https://` endpoint, or a path with no shell characters that names a folder below `/` or `~`) | error |
+| H16 | A non-empty `deploy.target` has a matching `.github/workflows/deploy-<target>.yml` | error |
 | S1 | The skill has a `SKILL.md` | error |
 | S2 | `SKILL.md` is UTF-8 and opens with a `---` frontmatter block | error |
 | S3 | The frontmatter is valid YAML and a mapping | error |
@@ -219,10 +268,6 @@ The generated commands on the marketplace page need `repo_url` to be a `https://
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, `chore:`). These prefixes decide each skill's next version, so pick them with care: `feat` for new behaviour, `fix` for corrected behaviour.
 
 Run `uv run ruff check`, `uv run pytest` and `uv run skill-hub qa` before opening a pull request. CI runs all three. To lint on every commit, install the hook once with `uv run pre-commit install`.
-
-## Roadmap
-
-1. **Deploying the marketplace page:** a swappable deploy step for Cloudflare Pages, Netlify, an S3 bucket or your own server.
 
 ## Prior art
 

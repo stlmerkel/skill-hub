@@ -3,6 +3,7 @@ import datetime
 import pytest
 
 from skill_hub.contract import (
+    DEPLOY_SETTING_RULES,
     github_repo,
     is_blank,
     is_hex_colour,
@@ -169,3 +170,96 @@ def test_unreserved_plugin_names(name):
 )
 def test_github_repo(url, expected):
     assert github_repo(url) == expected
+
+
+VALID_SETTINGS = [
+    ("s3", "bucket", "my-hub"),
+    ("s3", "bucket", "hub.example.com"),
+    ("s3", "bucket", "a" * 63),
+    ("s3", "endpoint", "https://abc123.r2.cloudflarestorage.com"),
+    ("s3", "endpoint", "https://minio.lan:9000"),
+    ("s3", "endpoint", "https://s3.example.com/"),
+    ("s3", "region", "us-east-1"),
+    ("s3", "region", "auto"),
+    ("rsync", "host", "web1.example.com"),
+    ("rsync", "host", "192.168.1.20"),
+    ("rsync", "host", "nas"),
+    ("rsync", "user", "deploy"),
+    ("rsync", "user", "www-data"),
+    ("rsync", "user", "_svc"),
+    ("rsync", "path", "/var/www/skills"),
+    ("rsync", "path", "~/public_html"),
+    ("rsync", "path", "sites/hub.v2"),
+    ("rsync", "port", 1),
+    ("rsync", "port", 22),
+    ("rsync", "port", 65535),
+]
+
+INVALID_SETTINGS = [
+    ("s3", "bucket", "ab"),
+    ("s3", "bucket", "a" * 64),
+    ("s3", "bucket", "My-Bucket"),
+    ("s3", "bucket", "-hub"),
+    ("s3", "bucket", "hub-"),
+    ("s3", "bucket", "a..b"),
+    ("s3", "bucket", "hub;id"),
+    ("s3", "bucket", "hub\n"),
+    ("s3", "endpoint", "http://minio.lan"),
+    ("s3", "endpoint", "https://"),
+    ("s3", "endpoint", "https://a.example/path"),
+    ("s3", "endpoint", "https://a.example;id"),
+    ("s3", "endpoint", "https://a.example\n"),
+    ("s3", "region", "US-EAST-1"),
+    ("s3", "region", "us east"),
+    ("s3", "region", "us-east-1\nrsync_host=evil"),
+    ("rsync", "host", "-oProxyCommand=id"),
+    ("rsync", "host", "web 1"),
+    ("rsync", "host", "web1;id"),
+    ("rsync", "host", "deploy@web1"),
+    ("rsync", "host", "web1\n"),
+    ("rsync", "user", "root;id"),
+    ("rsync", "user", "-l"),
+    ("rsync", "user", "Deploy"),
+    ("rsync", "user", "a" * 33),
+    ("rsync", "path", "-e sh"),
+    ("rsync", "path", "/var/www;id"),
+    ("rsync", "path", "/var/$(id)"),
+    ("rsync", "path", "/var/www/../etc"),
+    ("rsync", "path", "../up"),
+    ("rsync", "path", "/"),
+    ("rsync", "path", "//"),
+    ("rsync", "path", "/."),
+    ("rsync", "path", "."),
+    ("rsync", "path", "./"),
+    ("rsync", "path", "~"),
+    ("rsync", "path", "~/"),
+    ("rsync", "path", "~root"),
+    ("rsync", "path", "/var/www\t"),
+    ("rsync", "path", "/var/www\r"),
+    ("rsync", "path", "/var/www\n"),
+    ("rsync", "path", "/var/www\x00"),
+    ("rsync", "path", "/var/my site"),
+    ("rsync", "port", 0),
+    ("rsync", "port", 65536),
+    ("rsync", "port", True),
+    ("rsync", "port", "22"),
+]
+
+
+@pytest.mark.parametrize("target, key, value", VALID_SETTINGS)
+def test_valid_deploy_settings(target, key, value):
+    rule, _ = DEPLOY_SETTING_RULES[(target, key)]
+    assert rule(value)
+
+
+@pytest.mark.parametrize("target, key, value", INVALID_SETTINGS)
+def test_invalid_deploy_settings(target, key, value):
+    rule, _ = DEPLOY_SETTING_RULES[(target, key)]
+    assert not rule(value)
+
+
+def test_every_deploy_setting_has_a_rule():
+    from skill_hub.contract import DEPLOY_TARGET_SETTINGS
+
+    expected = {(target, key) for target, keys in DEPLOY_TARGET_SETTINGS.items() for key in keys}
+    assert set(DEPLOY_SETTING_RULES) == expected

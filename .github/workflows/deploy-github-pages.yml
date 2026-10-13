@@ -1,0 +1,29 @@
+name: Deploy to GitHub Pages
+
+# Called from qa.yml when hub.yml sets deploy.target: github-pages.
+# One-time setup: Settings > Pages > Source: GitHub Actions.
+on:
+  workflow_call:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: marketplace-page
+          path: site/
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site/
+      - id: pages
+        uses: actions/deploy-pages@v5

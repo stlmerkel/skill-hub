@@ -1,4 +1,4 @@
-"""Load and check hub.yml (checks H1-H11)."""
+"""Load and check hub.yml (checks H1-H16; the deploy block's H12-H16 live in deploy.py)."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -6,6 +6,7 @@ from pathlib import Path
 from skill_hub.contract import (
     DEFAULT_HUB_NAME,
     DEFAULT_REPO_URL,
+    HUB_FILE,
     is_blank,
     is_utf8_encodable,
     is_hex_colour,
@@ -14,10 +15,10 @@ from skill_hub.contract import (
     is_valid_name,
     type_name,
 )
+from skill_hub.deploy import DeploySettings, check_deploy
 from skill_hub.findings import ERROR, WARNING, Finding
 from skill_hub.yamlutil import load_yaml
 
-HUB_FILE = "hub.yml"
 REQUIRED_HUB_KEYS = ("name", "display_name", "owner", "description", "repo_url")
 SITE_KEYS = ("accent", "logo_url", "theme")
 THEME_ENTRY = "index.html.j2"
@@ -39,6 +40,7 @@ class HubConfig:
     repo_url: str
     allow_keys: tuple[str, ...]
     site: SiteSettings = SiteSettings()
+    deploy: DeploySettings = DeploySettings()
 
 
 MANIFEST_KEYS = ("owner", "description")  # copied into the marketplace manifests, which are written as UTF-8
@@ -164,6 +166,11 @@ def check_hub(root: Path) -> tuple[list[Finding], HubConfig | None]:
     site_findings, site = _check_site(root, data)
     findings.extend(site_findings)
 
+    deploy_findings, deploy = check_deploy(root, data)
+    findings.extend(deploy_findings)
+
     if any(finding.level == ERROR for finding in findings):
         return findings, None
-    return findings, HubConfig(*(hub[key] for key in REQUIRED_HUB_KEYS), allow_keys=allow_keys, site=site)
+    return findings, HubConfig(
+        *(hub[key] for key in REQUIRED_HUB_KEYS), allow_keys=allow_keys, site=site, deploy=deploy
+    )
