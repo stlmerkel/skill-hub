@@ -291,7 +291,7 @@ This section is for the people who publish kit releases. Hubs can skip it.
 - **Mark the kit repository.** Set the repository variable `SKILL_HUB_KIT_RELEASES` to `true` (Settings → Secrets and variables → Actions → Variables). It turns on the kit's own Release Please stream, which tags `kit-v<version>`, and switches off the update workflow, which would have nothing to update from.
 - **Protect the tags.** Add a tag ruleset for `kit-v*` that blocks updates and deletion. Hubs check that a release tag still points at the commit they recorded, and stop if it moved.
 - **Keep `main` releasable.** A hub created between releases records the last release, so what is on `main` reaches that hub's first update.
-- **Remove `release-as` after `kit-v1.0.0`.** `kit-release-please-config.json` pins the first release with `release-as`. Once `kit-v1.0.0` is cut, remove that key and update `test_kit_package_shape`, which asserts it, in the same commit. `test_release_as_is_removed_after_first_release` fails until you do.
+- **Remove `release-as` after `kit-v1.0.0`.** `kit-release-please-config.json` pins the first release with `release-as`. Once `kit-v1.0.0` is cut, remove that key, or every later release is forced to 1.0.0 again.
 - **A root-only commit still bumps the kit.** Release Please can only exclude folders, so a `feat:` or `fix:` commit that touches only root-level hub-owned files (`README.md` or the release-please files) still bumps the kit version.
 
 ## QA checks
