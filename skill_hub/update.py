@@ -105,7 +105,7 @@ def run_update(
 
     if skip_workflows and kit.pending:
         pair = (kit.workflows_version, kit.workflows_commit)
-    elif skip_workflows:
+    elif skip_workflows and result.pending_workflows:  # equal workflow files make the target a correct base
         pair = (kit.version, tags[current])
     else:
         pair = ("", "")

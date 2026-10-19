@@ -348,3 +348,13 @@ def test_uv_lock_failure_keeps_hub_copy(tmp_path, monkeypatch, command):
     outcome = _outcome(result, "uv.lock")
     assert (outcome.action, outcome.reason) == ("kept", update.LOCK_FAILED)
     assert update.LOCK_FAILED in format_summary(result)
+
+
+def test_skip_workflows_without_workflow_changes_is_not_pending(tmp_path):
+    _, hub = build(tmp_path, [("1.0.0", kit_a()), ("1.1.0", {"skill_hub/new.py": b"NEW = True\n"})])
+    result = run_update(hub, skip_workflows=True)
+    assert result.pending_workflows == []
+    kit = read_kit_file(hub)
+    assert (kit.version, kit.pending) == ("1.1.0", False)
+    assert "--workflows-only" not in format_summary(result)
+    assert not any(f.check_id == "H17" for f in update.run_qa(hub).warnings)

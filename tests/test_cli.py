@@ -354,3 +354,16 @@ def test_update_cli_flag_conflicts(tmp_path, capsys):
             main(["update", "--root", str(tmp_path), "--workflows-only", flag])
         assert exit_info.value.code == 2
         assert "--workflows-only cannot be combined with" in capsys.readouterr().err
+
+
+def test_update_cli_summary_file_write_failure(tmp_path, monkeypatch, capsys):
+    hub = _update_hub(tmp_path)
+    output = tmp_path / "github-output"
+    output.write_text("", encoding="utf-8")
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    summary = tmp_path / "missing-folder" / "summary.md"
+    assert main(["update", "--root", str(hub), "--summary-file", str(summary), "--github-output"]) == 1
+    captured = capsys.readouterr()
+    assert captured.err == "error: could not write the summary file\n"
+    assert "Traceback" not in captured.out + captured.err
+    assert output.read_text(encoding="utf-8") == ""

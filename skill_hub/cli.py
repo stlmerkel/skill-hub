@@ -42,7 +42,11 @@ def _update(args: argparse.Namespace) -> int:
         text = format_summary(result)
     print(text, end="")
     if args.summary_file:
-        args.summary_file.write_text(text, encoding="utf-8")
+        try:
+            args.summary_file.write_text(text, encoding="utf-8")
+        except OSError:
+            print("error: could not write the summary file", file=sys.stderr)
+            return 1  # $GITHUB_OUTPUT is written only after the summary, so the workflow sees no outputs
     if args.github_output:
         with open(output, "a", encoding="utf-8") as file:
             file.write(render_update_outputs(result))
