@@ -30,6 +30,9 @@ HUB_OWNED_PATHS: tuple[str, ...] = (
     ".claude-plugin/marketplace.json",
     ".cursor-plugin/marketplace.json",
 )
+# The kit's own Release Please stream (kit-owned, never copied into a hub).
+KIT_RELEASE_CONFIG = "kit-release-please-config.json"
+KIT_RELEASE_MANIFEST = ".kit-release-please-manifest.json"
 # Regenerated from other files, never merged.
 DERIVED_PATHS = frozenset({"uv.lock"})
 # Skill names the kit keeps for itself: `kit` would collide with the kit's own release tags.
