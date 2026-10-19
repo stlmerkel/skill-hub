@@ -4,7 +4,9 @@ from pathlib import Path
 
 import yaml
 
-WORKFLOW = Path(__file__).parent.parent / ".github" / "workflows" / "qa.yml"
+# The fixture copy: a hub may edit the live file or not have it yet (pending workflow files), and
+# tests/test_kit_snapshots.py keeps the fixture equal to the live file in the kit repo.
+WORKFLOW = Path(__file__).parent / "fixtures" / "kit-workflows" / "qa.yml"
 
 
 def build_job() -> dict:

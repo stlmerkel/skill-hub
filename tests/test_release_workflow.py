@@ -7,7 +7,9 @@ import yaml
 from skill_hub.contract import KIT_RELEASE_CONFIG, KIT_RELEASE_MANIFEST
 from skill_hub.releases import RELEASE_CONFIG, RELEASE_MANIFEST
 
-WORKFLOW = Path(__file__).parent.parent / ".github" / "workflows" / "release.yml"
+# The fixture copy: a hub may edit the live file or not have it yet (pending workflow files), and
+# tests/test_kit_snapshots.py keeps the fixture equal to the live file in the kit repo.
+WORKFLOW = Path(__file__).parent / "fixtures" / "kit-workflows" / "release.yml"
 
 
 def load() -> dict:
