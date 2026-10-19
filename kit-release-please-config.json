@@ -12,19 +12,12 @@
       "changelog-path": "CHANGELOG.md",
       "release-as": "1.0.0",
       "exclude-paths": [
-        "README.md",
         "skills",
-        "release-please-config.json",
-        ".release-please-manifest.json",
-        ".claude-plugin/marketplace.json",
-        ".cursor-plugin/marketplace.json"
+        ".claude-plugin",
+        ".cursor-plugin"
       ],
       "extra-files": [
-        ".skill-hub/kit.yml",
-        {
-          "type": "generic",
-          "path": "pyproject.toml"
-        }
+        ".skill-hub/kit.yml"
       ]
     }
   }
