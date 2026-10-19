@@ -1,7 +1,7 @@
 name: Deploy to a server over rsync
 
 # Called from qa.yml when hub.yml sets deploy.target: rsync. Copy this file as the model
-# for your own deploy target (see "Your own deploy target" in the README).
+# for your own deploy target (see "Your own deploy target" in KIT.md).
 on:
   workflow_call:
     inputs:

@@ -21,7 +21,7 @@ site:
 
 deploy:
   # Where CI publishes the marketplace page on every push to main. Empty = never deploy.
-  # Built in: github-pages, s3, rsync. See "Deploying the marketplace page" in the README.
+  # Built in: github-pages, s3, rsync. See "Deploying the marketplace page" in KIT.md.
   # Keys and SSH keys go in your repository's Actions secrets, never in this file.
   target: ""
   s3:
