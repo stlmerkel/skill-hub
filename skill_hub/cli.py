@@ -1,6 +1,6 @@
 # skill_hub/cli.py
-"""Command-line entry point: `skill-hub qa`, `skill-hub new-skill`, `skill-hub manifests`, `skill-hub build`
-and `skill-hub deploy-config`."""
+"""Command-line entry point: `skill-hub qa`, `skill-hub new-skill`, `skill-hub manifests`, `skill-hub build`,
+`skill-hub deploy-config` and `skill-hub update`."""
 
 import argparse
 import os
@@ -10,22 +10,43 @@ from pathlib import Path
 from skill_hub.catalog import BuildError
 from skill_hub.config import check_hub
 from skill_hub.deploy import render_outputs
-from skill_hub.manifests import MANIFEST_PATHS, ManifestError, render_manifests, write_manifests
+from skill_hub.kitfile import KitFileError
+from skill_hub.kitgit import KitGitError
+from skill_hub.manifests import MANIFEST_PATHS, ManifestError, update_manifests
 from skill_hub.qa import format_report, run_qa
 from skill_hub.releases import RELEASE_CONFIG
 from skill_hub.scaffold import ScaffoldError, create_skill
 from skill_hub.site import build_site
+from skill_hub.update import UpdateError, format_summary, render_update_outputs, run_update
 
 
-def _update_manifests(root: Path) -> int:
-    """Regenerate both marketplace manifests and return the skill count. Raises ManifestError."""
-    result = run_qa(root)
-    blocking = len([f for f in result.errors if f.check_id != "R7"])
-    if blocking:
-        errors = "error" if blocking == 1 else "errors"
-        raise ManifestError(f"QA found {blocking} {errors}; run `skill-hub qa` and fix them first")
-    write_manifests(root, render_manifests(root, check_hub(root)[1]))
-    return result.skill_count
+def _update(args: argparse.Namespace) -> int:
+    output = os.environ.get("GITHUB_OUTPUT")
+    if args.github_output and not output:
+        print("error: GITHUB_OUTPUT is not set; --github-output only works inside GitHub Actions", file=sys.stderr)
+        return 1
+    try:
+        result = run_update(
+            args.root,
+            major=args.major,
+            skip_workflows=args.skip_workflows,
+            workflows_only=args.workflows_only,
+            check_only=args.check,
+        )
+    except (UpdateError, KitFileError, KitGitError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    if args.check and result.to_version:
+        text = f"Kit update available: {result.from_version} → {result.to_version}\n"
+    else:
+        text = format_summary(result)
+    print(text, end="")
+    if args.summary_file:
+        args.summary_file.write_text(text, encoding="utf-8")
+    if args.github_output:
+        with open(output, "a", encoding="utf-8") as file:
+            file.write(render_update_outputs(result))
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -53,7 +74,28 @@ def main(argv: list[str] | None = None) -> int:
     deploy_config.add_argument(
         "--github-output", action="store_true", help="append to the file named by $GITHUB_OUTPUT instead of printing"
     )
+    update = commands.add_parser("update", help="merge the newest kit release into this hub (never commits)")
+    update.add_argument(
+        "--root", type=Path, default=Path("."), help="hub root containing .skill-hub/kit.yml (default: .)"
+    )
+    update.add_argument("--major", action="store_true", help="allow a newer major kit release")
+    update.add_argument(
+        "--skip-workflows", action="store_true", help="leave .github/workflows/ alone and record them as pending"
+    )
+    update.add_argument(
+        "--workflows-only", action="store_true", help="apply the workflow files an earlier update left pending"
+    )
+    update.add_argument("--check", action="store_true", help="only report the target release; change nothing")
+    update.add_argument("--summary-file", type=Path, help="also write the summary (markdown) to this file")
+    update.add_argument(
+        "--github-output", action="store_true", help="append target, newer_major and changed to $GITHUB_OUTPUT"
+    )
     args = parser.parse_args(argv)
+
+    if args.command == "update":
+        if args.workflows_only and (args.major or args.skip_workflows or args.check):
+            update.error("--workflows-only cannot be combined with --major, --skip-workflows or --check")
+        return _update(args)
 
     if args.command == "deploy-config":
         config = check_hub(args.root)[1]
@@ -88,7 +130,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "manifests":
         try:
-            count = _update_manifests(args.root)
+            count = update_manifests(args.root)
         except ManifestError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 1
@@ -107,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Release registration skipped: no {RELEASE_CONFIG}")
         print("Next: replace the placeholder description and instructions, then run `uv run skill-hub qa`.")
         try:
-            _update_manifests(args.root)
+            update_manifests(args.root)
         except ManifestError:
             print("Manifests not updated: fix the QA errors, then run `skill-hub manifests`")
         else:

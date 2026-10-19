@@ -4,6 +4,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from skill_hub.cli import main
 from skill_hub.findings import WARNING, Finding
 from skill_hub.manifests import MANIFEST_PATHS, ManifestError
@@ -225,7 +227,7 @@ def test_manifests_command_reports_a_write_failure(tmp_path, capsys, monkeypatch
     def broken(root, rendered):
         raise ManifestError("could not write .claude-plugin/marketplace.json")
 
-    monkeypatch.setattr("skill_hub.cli.write_manifests", broken)
+    monkeypatch.setattr("skill_hub.manifests.write_manifests", broken)
     assert main(["manifests", "--root", str(tmp_path)]) == 1
     assert capsys.readouterr().err.strip() == "error: could not write .claude-plugin/marketplace.json"
 
@@ -298,3 +300,57 @@ def test_deploy_config_needs_github_output_set(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("GITHUB_OUTPUT", raising=False)
     assert main(["deploy-config", "--root", str(tmp_path), "--github-output"]) == 1
     assert "GITHUB_OUTPUT" in capsys.readouterr().err
+
+
+def _update_hub(tmp_path):
+    from tests.test_update import KIT_B, build, kit_a
+
+    return build(tmp_path, [("1.0.0", kit_a()), ("1.1.0", KIT_B)])[1]
+
+
+def test_update_cli_github_output(tmp_path, monkeypatch, capsys):
+    hub = _update_hub(tmp_path)
+    output = tmp_path / "github-output"
+    output.write_text("earlier=1\n", encoding="utf-8")
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    assert main(["update", "--root", str(hub), "--check", "--github-output"]) == 0
+    assert output.read_text(encoding="utf-8") == "earlier=1\ntarget=1.1.0\nnewer_major=\nchanged=true\n"
+    assert "1.0.0 → 1.1.0" in capsys.readouterr().out
+    assert (hub / "hub.yml").read_text().count("site:") == 0  # --check writes nothing
+
+
+def test_update_cli_github_output_needs_the_variable(tmp_path, monkeypatch, capsys):
+    hub = _update_hub(tmp_path)
+    monkeypatch.delenv("GITHUB_OUTPUT", raising=False)
+    assert main(["update", "--root", str(hub), "--github-output"]) == 1
+    assert "GITHUB_OUTPUT" in capsys.readouterr().err
+    assert "site:" not in (hub / "hub.yml").read_text()
+
+
+def test_update_cli_summary_file(tmp_path, capsys):
+    hub = _update_hub(tmp_path)
+    summary = tmp_path / "summary.md"
+    assert main(["update", "--root", str(hub), "--summary-file", str(summary)]) == 0
+    text = summary.read_text(encoding="utf-8")
+    assert text.startswith("## Kit update: 1.0.0 → 1.1.0")
+    assert "`skill_hub/example.py`" in text
+    assert "site:" in (hub / "hub.yml").read_text()
+
+
+def test_update_cli_error_exit(tmp_path, capsys):
+    hub = _update_hub(tmp_path)
+    (hub / "stray.txt").write_text("x")
+    assert main(["update", "--root", str(hub)]) == 1
+    captured = capsys.readouterr()
+    assert captured.err == "error: the working tree has uncommitted changes; commit or stash them first\n"
+    assert "Traceback" not in captured.out + captured.err
+    assert main(["update", "--root", str(tmp_path / "nowhere")]) == 1
+    assert capsys.readouterr().err == "error: kit.yml could not be read\n"
+
+
+def test_update_cli_flag_conflicts(tmp_path, capsys):
+    for flag in ("--major", "--skip-workflows", "--check"):
+        with pytest.raises(SystemExit) as exit_info:
+            main(["update", "--root", str(tmp_path), "--workflows-only", flag])
+        assert exit_info.value.code == 2
+        assert "--workflows-only cannot be combined with" in capsys.readouterr().err

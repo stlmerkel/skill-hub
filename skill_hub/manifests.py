@@ -5,7 +5,7 @@ import json
 import os
 from pathlib import Path
 
-from skill_hub.config import HubConfig
+from skill_hub.config import HubConfig, check_hub
 from skill_hub.findings import ERROR, Finding
 from skill_hub.skills import SKILLS_DIR, read_frontmatter, skill_dirs
 
@@ -47,6 +47,19 @@ def write_manifests(root: Path, rendered: dict[str, str]) -> None:
         except (OSError, UnicodeEncodeError):
             temp.unlink(missing_ok=True)
             raise ManifestError(f"could not write {rel}") from None
+
+
+def update_manifests(root: Path) -> int:
+    """Regenerate both marketplace manifests and return the skill count. Raises ManifestError."""
+    from skill_hub.qa import run_qa  # imported here: qa imports this module for check_manifests
+
+    result = run_qa(root)
+    blocking = len([f for f in result.errors if f.check_id != "R7"])
+    if blocking:
+        errors = "error" if blocking == 1 else "errors"
+        raise ManifestError(f"QA found {blocking} {errors}; run `skill-hub qa` and fix them first")
+    write_manifests(root, render_manifests(root, check_hub(root)[1]))
+    return result.skill_count
 
 
 def check_manifests(root: Path, config: HubConfig) -> list[Finding]:
