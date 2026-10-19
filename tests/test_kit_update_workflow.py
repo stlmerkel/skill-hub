@@ -48,6 +48,17 @@ def test_triggers():
     assert major["default"] is False
 
 
+def test_never_runs_in_the_kit_repo():
+    # The kit repo sets SKILL_HUB_KIT_RELEASES; it has no kit release behind it to update from.
+    assert workflow()["jobs"]["update"]["if"] == "vars.SKILL_HUB_KIT_RELEASES != 'true'"
+
+
+def test_push_leases_against_the_remote_branch():
+    run = script()
+    assert 'git ls-remote origin "refs/heads/$branch"' in run
+    assert '--force-with-lease="refs/heads/$branch:$remote_sha"' in run
+
+
 def test_permissions_least_privilege():
     assert workflow()["permissions"] == {}
     assert workflow()["jobs"]["update"]["permissions"] == {

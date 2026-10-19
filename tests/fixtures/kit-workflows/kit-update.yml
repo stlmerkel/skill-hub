@@ -20,6 +20,8 @@ concurrency:
 
 jobs:
   update:
+    # The kit repo itself (which sets SKILL_HUB_KIT_RELEASES) has nothing to update from; hubs never set it.
+    if: vars.SKILL_HUB_KIT_RELEASES != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -117,7 +119,15 @@ jobs:
           git -c user.name="github-actions[bot]" \
             -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
             commit -m "chore: update skill-hub kit to v${target}"
-          git push --force-with-lease origin "$branch"
+          # A branch left by an earlier run that failed before its PR opened belongs to no open or declined PR
+          # (steps 4 and 5), so overwrite it, leasing against the SHA seen now; the shallow checkout has no
+          # remote-tracking ref, and a plain lease would expect the branch to be absent.
+          remote_sha="$(git ls-remote origin "refs/heads/$branch" | cut -f1)"
+          if [ -n "$remote_sha" ]; then
+            git push --force-with-lease="refs/heads/$branch:$remote_sha" origin "$branch"
+          else
+            git push --force-with-lease origin "$branch"
+          fi
           gh label create kit-update --force --color 0e8a16 --description "Kit update pull request"
           if ! gh pr create --head "$branch" --title "Update skill-hub kit to v${target}" --label kit-update --body-file "$RUNNER_TEMP/body.md"; then
             echo 'error: could not open the pull request. Enable Settings > Actions > General > "Allow GitHub Actions to create and approve pull requests", then run this workflow again.' >&2
