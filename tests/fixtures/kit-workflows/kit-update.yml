@@ -23,6 +23,7 @@ jobs:
     # The kit repo itself (which sets SKILL_HUB_KIT_RELEASES) has nothing to update from; hubs never set it.
     if: vars.SKILL_HUB_KIT_RELEASES != 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
       pull-requests: write
@@ -31,6 +32,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           token: ${{ secrets.KIT_UPDATE_TOKEN || github.token }}
+          # The update runs code from an unreviewed kit release: keep the token out of .git/config.
+          persist-credentials: false
       - uses: astral-sh/setup-uv@v10.2.0
         with:
           python-version: "3.11"
@@ -43,18 +46,27 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Only the git calls that talk to this hub's remote get the token, through the environment (never argv,
+          # never echoed); the updater runs without GH_TOKEN, so nothing it starts (such as `uv lock`) can read it.
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git_auth() {
+            GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="http.${GITHUB_SERVER_URL}/.extraheader" GIT_CONFIG_VALUE_0="$auth" git "$@"
+          }
+
           # 1. Ask the updater for the target release; --check fetches and writes nothing.
           check_args=(--check --github-output)
           if [ "$MAJOR" = "true" ]; then check_args+=(--major); fi
-          GITHUB_OUTPUT="$RUNNER_TEMP/check.out" uv run --locked skill-hub update "${check_args[@]}"
+          GITHUB_OUTPUT="$RUNNER_TEMP/check.out" env -u GH_TOKEN uv run --locked skill-hub update "${check_args[@]}"
           target="$(sed -n 's/^target=//p' "$RUNNER_TEMP/check.out")"
           newer_major="$(sed -n 's/^newer_major=//p' "$RUNNER_TEMP/check.out")"
 
           # 2. A newer major gets one issue, ever: search open and closed issues for the exact title first.
           if [ -n "$newer_major" ]; then
             title="skill-hub kit ${newer_major}.x is available"
-            titles="$(gh issue list --state all --search "$title in:title" --limit 100 --json title --jq '.[].title')"
-            if ! grep -Fxq "$title" <<<"$titles"; then
+            # Issues may be disabled in this hub: warn and carry on, so the major notice never blocks a minor update.
+            if ! titles="$(gh issue list --state all --search "$title in:title" --limit 100 --json title --jq '.[].title')"; then
+              echo "warning: could not search issues (are Issues enabled?); skipping the kit ${newer_major}.x notice" >&2
+            elif ! grep -Fxq "$title" <<<"$titles"; then
               {
                 echo "skill-hub kit ${newer_major}.x is available. A new major release can contain breaking changes, so this hub is not updated to it automatically."
                 echo
@@ -65,7 +77,9 @@ jobs:
                 echo
                 echo 'See CHANGELOG.md in the kit repository named in `.skill-hub/kit.yml` for what changed.'
               } > "$RUNNER_TEMP/major.md"
-              gh issue create --title "$title" --body-file "$RUNNER_TEMP/major.md"
+              if ! gh issue create --title "$title" --body-file "$RUNNER_TEMP/major.md"; then
+                echo "warning: could not open the kit ${newer_major}.x issue (are Issues enabled?); continuing" >&2
+              fi
             fi
           fi
 
@@ -105,7 +119,7 @@ jobs:
           update_args=(--github-output --summary-file "$RUNNER_TEMP/body.md")
           if [ "$HAS_TOKEN" != "true" ]; then update_args+=(--skip-workflows); fi
           if [ "$MAJOR" = "true" ]; then update_args+=(--major); fi
-          GITHUB_OUTPUT="$RUNNER_TEMP/update.out" uv run --locked skill-hub update "${update_args[@]}"
+          GITHUB_OUTPUT="$RUNNER_TEMP/update.out" env -u GH_TOKEN uv run --locked skill-hub update "${update_args[@]}"
           applied="$(sed -n 's/^target=//p' "$RUNNER_TEMP/update.out")"
           # The checks above were for $target; a release published mid-run would need them redone.
           if [ "$applied" != "$target" ]; then
@@ -122,11 +136,11 @@ jobs:
           # A branch left by an earlier run that failed before its PR opened belongs to no open or declined PR
           # (steps 4 and 5), so overwrite it, leasing against the SHA seen now; the shallow checkout has no
           # remote-tracking ref, and a plain lease would expect the branch to be absent.
-          remote_sha="$(git ls-remote origin "refs/heads/$branch" | cut -f1)"
+          remote_sha="$(git_auth ls-remote origin "refs/heads/$branch" | cut -f1)"
           if [ -n "$remote_sha" ]; then
-            git push --force-with-lease="refs/heads/$branch:$remote_sha" origin "$branch"
+            git_auth push --force-with-lease="refs/heads/$branch:$remote_sha" origin "$branch"
           else
-            git push --force-with-lease origin "$branch"
+            git_auth push --force-with-lease origin "$branch"
           fi
           gh label create kit-update --force --color 0e8a16 --description "Kit update pull request"
           if ! gh pr create --head "$branch" --title "Update skill-hub kit to v${target}" --label kit-update --body-file "$RUNNER_TEMP/body.md"; then

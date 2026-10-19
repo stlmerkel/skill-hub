@@ -55,8 +55,38 @@ def test_never_runs_in_the_kit_repo():
 
 def test_push_leases_against_the_remote_branch():
     run = script()
-    assert 'git ls-remote origin "refs/heads/$branch"' in run
+    assert 'git_auth ls-remote origin "refs/heads/$branch"' in run
     assert '--force-with-lease="refs/heads/$branch:$remote_sha"' in run
+
+
+def test_token_reaches_only_the_remote_git_calls():
+    # The checkout keeps no credentials; the push and ls-remote get the token through env, and the updater
+    # (which may run `uv lock` on an unreviewed pyproject.toml) runs without GH_TOKEN.
+    assert uses(steps(), "actions/checkout")["with"]["persist-credentials"] is False
+    run = script()
+    assert 'GIT_CONFIG_KEY_0="http.${GITHUB_SERVER_URL}/.extraheader" GIT_CONFIG_VALUE_0="$auth" git "$@"' in run
+    code = [line.strip() for line in run.splitlines() if not line.strip().startswith("#")]
+    remote_calls = [line for line in code if " push " in line or "ls-remote" in line]
+    assert len(remote_calls) == 3
+    assert all("git_auth " in line and "git push" not in line for line in remote_calls), remote_calls
+    updater_calls = [line for line in run.splitlines() if "uv run --locked skill-hub update" in line]
+    assert len(updater_calls) == 2
+    assert all("env -u GH_TOKEN uv run" in line for line in updater_calls), updater_calls
+    assert "set -x" not in run and "echo \"$auth\"" not in run
+
+
+def test_job_times_out():
+    assert workflow()["jobs"]["update"]["timeout-minutes"] == 15
+
+
+def test_issue_commands_never_stop_the_run():
+    # A hub with Issues disabled still gets minor updates: both issue calls are guarded and only warn.
+    run = script()
+    assert 'if ! titles="$(gh issue list ' in run
+    assert 'if ! gh issue create ' in run
+    issue_lines = [line.strip() for line in run.splitlines() if "gh issue " in line]
+    assert len(issue_lines) == 2 and all(line.startswith("if ! ") for line in issue_lines), issue_lines
+    assert run.count('echo "warning: could not') == 2
 
 
 def test_permissions_least_privilege():
