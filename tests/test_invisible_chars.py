@@ -24,5 +24,6 @@ def test_no_literal_bom_in_tracked_files():
         ["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True
     ).stdout.splitlines()
     kit_files = [p for p in tracked if p not in ADOPTER_FILES and not p.startswith(f"{SKILLS_DIR}/")]
-    offenders = [p for p in kit_files if BOM in (ROOT / p).read_bytes()]
+    # A kit update deletes files before the deletion is staged: git still lists them, the disk no longer has them.
+    offenders = [p for p in kit_files if (ROOT / p).is_file() and BOM in (ROOT / p).read_bytes()]
     assert offenders == [], "write U+FEFF as the escape \\ufeff instead"
