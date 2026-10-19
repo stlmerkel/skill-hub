@@ -149,3 +149,15 @@ def test_no_kit_file_no_h17(tmp_path):
 def test_current_kit_file_has_no_h17(tmp_path):
     _hub_with_kit_file(tmp_path, 'repo: "https://github.com/acme/kit"\nversion: "1.1.0"\n')
     assert run_qa(tmp_path).findings == []
+
+
+@pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="permissions not enforced")
+def test_h17_unsearchable_kit_folder_warns(tmp_path):
+    _hub_with_kit_file(tmp_path, 'repo: "https://github.com/acme/kit"\nversion: "1.1.0"\n')
+    folder = tmp_path / ".skill-hub"
+    folder.chmod(0o644)
+    try:
+        result = run_qa(tmp_path)
+    finally:
+        folder.chmod(0o755)
+    assert ids(result.findings) == ["H17"] and not result.errors

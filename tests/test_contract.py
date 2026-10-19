@@ -296,7 +296,7 @@ def test_is_valid_kit_repo_accepts(value):
 
 
 @pytest.mark.parametrize(
-    "value", ["", "-uhttps://x", "https://", "file://", "https://a b", "ssh://x", "https://a\nb", "https://a\\b"]
+    "value", ["", "-uhttps://x", "https://", "file://", "https://a b", "ssh://x", "https://a\nb", "https://a\\b", 'https://a"b']
 )
 def test_is_valid_kit_repo_rejects(value):
     assert not is_valid_kit_repo(value)

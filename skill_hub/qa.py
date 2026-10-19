@@ -99,8 +99,13 @@ def run_qa(root: Path) -> QaResult:
 
 def _check_kit_file(root: Path) -> list[Finding]:
     """H17: a kit.yml that cannot be read, or that records workflow files an update held back."""
-    if not (root / KIT_FILE).exists():
+    # lstat, not Path.exists(): Python 3.11 re-raises PermissionError from exists().
+    try:
+        (root / KIT_FILE).lstat()
+    except FileNotFoundError:
         return []
+    except OSError:
+        pass  # present but unreadable: read_kit_file below reports it
     try:
         kit = read_kit_file(root)
     except KitFileError:

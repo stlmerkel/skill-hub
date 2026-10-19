@@ -76,8 +76,8 @@ def parse_kit_tag(tag: str) -> tuple[int, int, int] | None:
 
 
 def is_valid_kit_repo(value: str) -> bool:
-    """An https:// or file:// location: never an option-like string, and no whitespace, control or backslash."""
-    if "\\" in value or any(ord(char) <= 0x20 or ord(char) == 0x7F for char in value):
+    """An https:// or file:// location: never an option-like string, and no whitespace, control, quote or backslash."""
+    if '"' in value or "\\" in value or any(ord(char) <= 0x20 or ord(char) == 0x7F for char in value):
         return False
     return any(value.startswith(scheme) and len(value) > len(scheme) for scheme in (_HTTPS, "file://"))
 
