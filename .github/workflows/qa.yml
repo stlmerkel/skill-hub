@@ -22,6 +22,8 @@ jobs:
       - run: uv sync --locked
       - run: uv run --locked ruff check
       - run: uv run --locked pytest
+        env:
+          SKILL_HUB_KIT_RELEASES: ${{ vars.SKILL_HUB_KIT_RELEASES }}
       - run: uv run --locked skill-hub qa
 
   build:
