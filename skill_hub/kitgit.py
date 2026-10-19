@@ -72,7 +72,10 @@ def newer_major(tags: dict[Version, str], current: Version) -> int | None:
 
 
 def require_clean_repo(root: Path) -> None:
-    _git(root, "rev-parse", "--git-dir", failure="this folder is not a git repository")
+    top = _git(root, "rev-parse", "--show-toplevel", failure="this folder is not a git repository")
+    # A hub nested in another repo would fetch kit refs into, and read status from, the outer repo.
+    if Path(os.fsdecode(top.strip())).resolve() != root.resolve():
+        raise KitGitError("this folder is not the top of its own git repository")
     out = _git(root, "status", "--porcelain", failure="could not read the working tree status")
     if out.strip():
         raise KitGitError("the working tree has uncommitted changes; commit or stash them first")

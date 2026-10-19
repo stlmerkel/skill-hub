@@ -105,6 +105,17 @@ def test_require_clean_repo(tmp_path):
         require_clean_repo(plain)
 
 
+def test_require_clean_repo_rejects_a_hub_nested_in_another_repo(tmp_path):
+    outer = make_hub(tmp_path / "outer", "file:///k", "1.0.0", {".gitignore": b"inner/\n"})
+    inner = outer / "inner"
+    inner.mkdir()
+    (inner / "hub.yml").write_text("name: x\n")
+    assert git(outer, "status", "--porcelain") == ""  # git-ignored: the outer repo reads as clean
+    with pytest.raises(KitGitError, match="not the top of its own git repository") as info:
+        require_clean_repo(inner)
+    assert "inner" not in str(info.value)
+
+
 def test_tree_entries_modes(tmp_path):
     url = make_kit_repo(
         tmp_path / "kit",
