@@ -3,6 +3,11 @@ import datetime
 import pytest
 
 from skill_hub.contract import (
+    is_hub_owned,
+    is_valid_commit,
+    is_valid_kit_repo,
+    parse_kit_tag,
+    parse_version,
     DEPLOY_SETTING_RULES,
     github_repo,
     is_blank,
@@ -263,3 +268,41 @@ def test_every_deploy_setting_has_a_rule():
 
     expected = {(target, key) for target, keys in DEPLOY_TARGET_SETTINGS.items() for key in keys}
     assert set(DEPLOY_SETTING_RULES) == expected
+
+
+def test_is_hub_owned():
+    for path in ("skills/a/SKILL.md", "README.md", ".claude-plugin/marketplace.json", "release-please-config.json"):
+        assert is_hub_owned(path)
+    for path in ("skills.md", "README.md.bak", "hub.yml", ".github/workflows/qa.yml", "skills"):
+        assert not is_hub_owned(path)
+
+
+def test_parse_kit_tag():
+    assert parse_kit_tag("kit-v1.2.3") == (1, 2, 3)
+    assert parse_kit_tag("kit-v10.0.12") == (10, 0, 12)
+    for tag in ("kit-v1.2.3-rc.1", "kit-v01.2.3", "kit-1.2.3", "v1.2.3", "kit-v1.2", "kit-v1.2.3\n", ""):
+        assert parse_kit_tag(tag) is None
+
+
+def test_parse_version():
+    assert parse_version("1.2.3") == (1, 2, 3)
+    for value in ("1.2", "01.2.3", "1.2.3-rc.1", "kit-v1.2.3", "\u0661.2.3", "1.2.3\n"):
+        assert parse_version(value) is None
+
+
+@pytest.mark.parametrize("value", ["https://github.com/a/b", "file:///tmp/kit"])
+def test_is_valid_kit_repo_accepts(value):
+    assert is_valid_kit_repo(value)
+
+
+@pytest.mark.parametrize(
+    "value", ["", "-uhttps://x", "https://", "file://", "https://a b", "ssh://x", "https://a\nb", "https://a\\b"]
+)
+def test_is_valid_kit_repo_rejects(value):
+    assert not is_valid_kit_repo(value)
+
+
+def test_is_valid_commit():
+    assert is_valid_commit("a" * 40) and is_valid_commit("0123456789abcdef" * 2 + "01234567")
+    for value in ("", "a" * 39, "a" * 41, "A" * 40, "g" * 40, "a" * 39 + "\n"):
+        assert not is_valid_commit(value)

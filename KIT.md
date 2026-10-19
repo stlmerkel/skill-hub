@@ -232,6 +232,7 @@ The generated commands on the marketplace page need `repo_url` to be a `https://
 | H14 | The chosen target has its required settings: `s3` needs `bucket` and `region`; `rsync` needs `host`, `user` and `path` | error |
 | H15 | Every filled-in deploy setting, for any target, has a safe value (such as a valid bucket name, an `https://` endpoint, or a path with no shell characters that names a folder below `/` or `~`) | error |
 | H16 | A non-empty `deploy.target` has a matching `.github/workflows/deploy-<target>.yml` | error |
+| H17 | `.skill-hub/kit.yml`, if present, can be read and has no workflow files held back by an update | warning |
 | S1 | The skill has a `SKILL.md` | error |
 | S2 | `SKILL.md` is UTF-8 and opens with a `---` frontmatter block | error |
 | S3 | The frontmatter is valid YAML and a mapping | error |
@@ -249,6 +250,7 @@ The generated commands on the marketplace page need `repo_url` to be a `https://
 | S15 | `metadata.version` matches the skill's manifest entry, and its `version.txt` if it has one | error |
 | S16 | A registered skill that has never been released has a `metadata.version` other than its first-release version (`initial-version`), which the first release would overwrite | warning |
 | S17 | The skill's name doesn't pass for one of Anthropic's own plugins (such as a `claude-` or `anthropic-` prefix), which Claude Code's plugin validator rejects | warning |
+| S18 | The skill's name is not `kit`, which the kit keeps for its own release tags | error |
 | R1 | `skills/` exists and can be read | error |
 | R2 | `skills/` holds at least one skill | error |
 | R3 | A loose file sits directly in `skills/` | warning |
