@@ -319,6 +319,11 @@ def _outcome(result, path):
     return next(o for o in result.outcomes if o.path == path)
 
 
+def test_uv_lock_never_builds_source_distributions():
+    # Building an sdist runs its code, and the update runs before review with a write token.
+    assert update.UV_LOCK == ["uv", "lock", "--no-build"]
+
+
 def test_uv_lock_unchanged_by_hub_takes_kit(tmp_path, monkeypatch):
     monkeypatch.setattr(update, "UV_LOCK", ["definitely-not-a-command-skill-hub"])
     hub = _lock_hub(tmp_path, b"lock A\n")

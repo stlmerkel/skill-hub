@@ -31,7 +31,9 @@ LOCK_FAILED = "`uv lock` could not regenerate uv.lock; the hub's copy was kept"
 WORKFLOWS_COMMAND = "uv run skill-hub update --workflows-only"
 LOCK_FILE = "uv.lock"
 PYPROJECT = "pyproject.toml"
-UV_LOCK = ["uv", "lock"]
+# Runs on the merged, unreviewed pyproject.toml, possibly holding a write token: never build an sdist (its
+# build code would run). A resolution that needs a build fails into LOCK_FAILED and keeps the hub's lock.
+UV_LOCK = ["uv", "lock", "--no-build"]
 _CHANGELOG_HEADING = re.compile(r"^## \[?(\d+\.\d+\.\d+)", re.MULTILINE)
 
 

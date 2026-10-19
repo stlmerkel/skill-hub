@@ -282,7 +282,7 @@ The workflow runs your hub's own `skill-hub`, from the code already in your repo
 - The two marketplace manifests, which are regenerated from your skills and `hub.yml` rather than merged.
 - Anything the kit doesn't ship, such as your own themes or extra workflows.
 
-`uv.lock` is regenerated with `uv lock` when needed instead of being merged. A file you deleted stays deleted. One known limit: if you deleted a file, the kit later removed it, and a still later release brings it back, it returns as a new file.
+`uv.lock` is regenerated with `uv lock --no-build` when needed instead of being merged; if the new dependencies can only be resolved by building a source distribution, the hub's lock is kept and the summary says so. A file you deleted stays deleted. One known limit: if you deleted a file, the kit later removed it, and a still later release brings it back, it returns as a new file.
 
 ## Maintaining the kit
 
