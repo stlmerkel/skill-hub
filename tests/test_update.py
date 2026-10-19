@@ -157,6 +157,8 @@ def test_update_scenario_keeps_edits(tmp_path):
     assert b"<<<<<<< your hub" in (hub / "skill_hub/example.py").read_bytes()
     summary = format_summary(result)
     assert "`skill_hub/example.py`" in summary.split("### Conflicts")[1]
+    assert update.WEB_EDITOR_HINT in summary.split("### Conflicts")[1].split("###")[0]
+    assert '"Files changed"' in update.WEB_EDITOR_HINT and "`>>>>>>>`" in update.WEB_EDITOR_HINT
     assert {rel: (hub / rel).read_bytes() for rel in hub_owned} == before
     kit = read_kit_file(hub)
     assert (kit.version, kit.commit) == ("1.1.0", sha(tmp_path, "1.1.0"))
@@ -179,7 +181,10 @@ def test_skip_workflows_then_catch_up(tmp_path):
     assert result.pending_workflows == [".github/workflows/qa.yml"]
     kit = read_kit_file(hub)
     assert (kit.version, kit.workflows_version, kit.workflows_commit) == ("1.1.0", "1.0.0", sha(tmp_path, "1.0.0"))
-    assert "uv run skill-hub update --workflows-only" in format_summary(result)
+    pending = format_summary(result).split("### Pending workflow files")[1].split("###")[0]
+    assert "uv run skill-hub update --workflows-only" in pending
+    assert update.TOKEN_HINT in pending
+    assert "KIT_UPDATE_TOKEN" in update.TOKEN_HINT and '"Updating your hub" in KIT.md' in update.TOKEN_HINT
     (hub / "skill_hub/example.py").write_bytes(SOURCE_HUB)
     commit_files(hub, {}, "update to 1.1.0")
     release(tmp_path, "1.2.0", kit_c)

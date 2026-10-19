@@ -29,6 +29,14 @@ TAG_MOVED = (
 NOT_PENDING = "no workflow files are pending; there is nothing to apply"
 LOCK_FAILED = "`uv lock` could not regenerate uv.lock; the hub's copy was kept"
 WORKFLOWS_COMMAND = "uv run skill-hub update --workflows-only"
+WEB_EDITOR_HINT = (
+    "To resolve one in GitHub's web editor: open the file in the update pull request's \"Files changed\" tab, edit it, "
+    "keep the lines you want, delete the `<<<<<<<`, `=======` and `>>>>>>>` lines, and commit to the update branch."
+)
+TOKEN_HINT = (
+    "To have future update pull requests carry workflow files too, add the optional `KIT_UPDATE_TOKEN` secret: "
+    "see \"Updating your hub\" in KIT.md."
+)
 LOCK_FILE = "uv.lock"
 PYPROJECT = "pyproject.toml"
 # Runs on the merged, unreviewed pyproject.toml, possibly holding a write token: never build an sdist (its
@@ -222,6 +230,7 @@ def format_summary(result: UpdateResult) -> str:
     if conflicts:
         out += ["### Conflicts", "", "Resolve the conflict markers in these files before merging:", ""]
         out += [f"- `{o.path}` ({_plural(o.conflicts, 'conflict')})" for o in conflicts] + [""]
+        out += [WEB_EDITOR_HINT, ""]
     kept = [o for o in result.outcomes if o.action == "kept"]
     if kept:
         out += ["### Files left alone", ""] + [f"- `{o.path}`: {o.reason}" for o in kept] + [""]
@@ -230,6 +239,7 @@ def format_summary(result: UpdateResult) -> str:
         out += [""]
         out += [f"- `{path}`" for path in result.pending_workflows]
         out += ["", f"Apply them locally after merging with `{WORKFLOWS_COMMAND}`, then push.", ""]
+        out += [TOKEN_HINT, ""]
     out += ["### Manifests", "", result.manifests_note or "Regenerated the marketplace manifests.", ""]
     out += ["### QA", "", f"QA: {_plural(result.qa_errors, 'error')}, {_plural(result.qa_warnings, 'warning')}"]
     return "\n".join(out) + "\n"
