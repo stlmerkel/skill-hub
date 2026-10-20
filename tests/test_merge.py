@@ -226,8 +226,11 @@ def _snapshot(*folders):
         ("a/../../x", UNSAFE_PATH),
         ("link/x", SYMLINK),
         ("", UNSAFE_PATH),
+        (".git/hooks/pre-commit", UNSAFE_PATH),
+        (".GIT/config", UNSAFE_PATH),
+        ("a/.git/config", UNSAFE_PATH),
     ],
-    ids=["dotdot", "absolute", "nested-dotdot", "symlink-parent", "empty"],
+    ids=["dotdot", "absolute", "nested-dotdot", "symlink-parent", "empty", "dot-git", "dot-git-case", "nested-dot-git"],
 )
 def test_unsafe_paths_are_refused(tmp_path, hub, blobs, path, reason):
     (hub / "a").mkdir()
