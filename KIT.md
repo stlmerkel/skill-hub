@@ -235,7 +235,7 @@ uv run skill-hub update --check   # report the target release, change nothing
 uv run skill-hub update           # merge it into the working tree; never commits
 ```
 
-Review the changes, commit them and open a PR as usual. `update` also rewrites `.skill-hub/kit.yml`, regenerates the marketplace manifests, regenerates `uv.lock` with `uv lock` when the kit's lock file or `pyproject.toml` changed, and ends with a QA count.
+Review the changes, commit them and open a PR as usual. `update` also rewrites `.skill-hub/kit.yml`, regenerates the marketplace manifests, handles `uv.lock` without running `uv lock` (see below), and ends with a QA count.
 
 ### Resolving conflicts
 
@@ -282,7 +282,7 @@ The workflow runs your hub's own `skill-hub`, from the code already in your repo
 - The two marketplace manifests, which are regenerated from your skills and `hub.yml` rather than merged.
 - Anything the kit doesn't ship, such as your own themes or extra workflows.
 
-`uv.lock` is regenerated with `uv lock --no-build` when needed instead of being merged; if the new dependencies can only be resolved by building a source distribution, the hub's lock is kept and the summary says so. A file you deleted stays deleted. One known limit: if you deleted a file, the kit later removed it, and a still later release brings it back, it returns as a new file.
+`uv.lock` is never merged as text and `update` never runs `uv lock` (that could execute the unreviewed release's code). If your lock matches the old kit's, the kit's new lock is taken; if the kit changed neither `uv.lock` nor `pyproject.toml`, yours is left alone; otherwise yours is kept and the summary asks you to run `uv lock` and commit the result before merging, since the PR's `uv sync --locked` check may fail until you do. A file you deleted stays deleted. One known limit: if you deleted a file, the kit later removed it, and a still later release brings it back, it returns as a new file.
 
 ## Maintaining the kit
 

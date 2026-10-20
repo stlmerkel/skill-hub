@@ -1,6 +1,6 @@
 """`skill-hub update`: kit releases built as git repos in tmp_path, merged into a throwaway hub."""
 
-import sys
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -324,40 +324,53 @@ def _outcome(result, path):
     return next(o for o in result.outcomes if o.path == path)
 
 
-def test_uv_lock_never_builds_source_distributions():
-    # Building an sdist runs its code, and the update runs before review with a write token.
-    assert update.UV_LOCK == ["uv", "lock", "--no-build"]
+def _forbid_subprocess(monkeypatch):
+    real = subprocess.run
+
+    def guard(command, *args, **kwargs):
+        if "uv" in command:
+            raise AssertionError(f"update started uv: {command!r}")
+        return real(command, *args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", guard)
+
+
+def test_update_module_has_no_subprocess_or_uv_lock_command():
+    assert not hasattr(update, "subprocess")
+    assert not hasattr(update, "UV_LOCK")
 
 
 def test_uv_lock_unchanged_by_hub_takes_kit(tmp_path, monkeypatch):
-    monkeypatch.setattr(update, "UV_LOCK", ["definitely-not-a-command-skill-hub"])
+    _forbid_subprocess(monkeypatch)
     hub = _lock_hub(tmp_path, b"lock A\n")
     result = run_update(hub)
     assert (hub / "uv.lock").read_bytes() == b"lock B\n"
     assert _outcome(result, "uv.lock").action == "updated"
 
 
-def test_uv_lock_changed_by_hub_is_regenerated(tmp_path, monkeypatch):
-    script = "import pathlib; pathlib.Path('uv.lock').write_text('regenerated\\n')"
-    monkeypatch.setattr(update, "UV_LOCK", [sys.executable, "-c", script])
-    hub = _lock_hub(tmp_path, b"lock hub\n")
+def test_uv_lock_kit_unchanged_leaves_hub_copy(tmp_path, monkeypatch):
+    _forbid_subprocess(monkeypatch)
+    releases = [("1.0.0", kit_a() | {"uv.lock": b"lock A\n"}), ("1.1.0", {"README.md": b"new\n"})]
+    _, hub = build(tmp_path, releases)
+    commit_files(hub, {"uv.lock": b"lock hub\n"}, "lock")
     result = run_update(hub)
-    assert (hub / "uv.lock").read_bytes() == b"regenerated\n"
-    assert _outcome(result, "uv.lock").action == "updated"
+    assert (hub / "uv.lock").read_bytes() == b"lock hub\n"
+    assert _outcome(result, "uv.lock").action == "unchanged"
 
 
-@pytest.mark.parametrize("command", [
-    [sys.executable, "-c", "import pathlib, sys; pathlib.Path('uv.lock').write_text('half'); sys.exit(1)"],
-    ["definitely-not-a-command-skill-hub"],
-])
-def test_uv_lock_failure_keeps_hub_copy(tmp_path, monkeypatch, command):
-    monkeypatch.setattr(update, "UV_LOCK", command)
+def test_uv_lock_hub_and_kit_both_changed_keeps_hub_and_asks_for_relock(tmp_path, monkeypatch):
+    _forbid_subprocess(monkeypatch)
     hub = _lock_hub(tmp_path, b"lock hub\n")
     result = run_update(hub)
     assert (hub / "uv.lock").read_bytes() == b"lock hub\n"
     outcome = _outcome(result, "uv.lock")
-    assert (outcome.action, outcome.reason) == ("kept", update.LOCK_FAILED)
-    assert update.LOCK_FAILED in format_summary(result)
+    assert (outcome.action, outcome.reason) == ("kept", update.LOCK_RELOCK)
+    assert update.LOCK_RELOCK == (
+        "the kit changed its dependencies and the hub's uv.lock differs; run `uv lock` and commit the result"
+    )
+    summary = format_summary(result)
+    assert "Run `uv lock` and commit before merging: the kit's dependencies changed." in summary
+    assert f"- `uv.lock`: {update.LOCK_RELOCK}" in summary
 
 
 def test_skip_workflows_without_workflow_changes_is_not_pending(tmp_path):

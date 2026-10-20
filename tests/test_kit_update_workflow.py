@@ -61,7 +61,7 @@ def test_push_leases_against_the_remote_branch():
 
 def test_token_reaches_only_the_remote_git_calls():
     # The checkout keeps no credentials; the push and ls-remote get the token through env, and the updater
-    # (which may run `uv lock` on an unreviewed pyproject.toml) runs without GH_TOKEN.
+    # (which merges an unreviewed release) runs without GH_TOKEN.
     assert uses(steps(), "actions/checkout")["with"]["persist-credentials"] is False
     run = script()
     assert 'GIT_CONFIG_KEY_0="http.${GITHUB_SERVER_URL}/.extraheader" GIT_CONFIG_VALUE_0="$auth" git "$@"' in run

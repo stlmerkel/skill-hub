@@ -1,7 +1,6 @@
 """`skill-hub update`: merge a newer kit release into the hub, then rewrite kit.yml and regenerate manifests."""
 
 import re
-import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -27,7 +26,8 @@ TAG_MOVED = (
     "the kit release tag this hub is on now points at a different commit than kit.yml records; the update stopped"
 )
 NOT_PENDING = "no workflow files are pending; there is nothing to apply"
-LOCK_FAILED = "`uv lock` could not regenerate uv.lock; the hub's copy was kept"
+LOCK_RELOCK = "the kit changed its dependencies and the hub's uv.lock differs; run `uv lock` and commit the result"
+LOCK_RELOCK_NOTE = "Run `uv lock` and commit before merging: the kit's dependencies changed."
 WORKFLOWS_COMMAND = "uv run skill-hub update --workflows-only"
 WEB_EDITOR_HINT = (
     "To resolve one in GitHub's web editor: open the file in the update pull request's \"Files changed\" tab, edit it, "
@@ -39,9 +39,6 @@ TOKEN_HINT = (
 )
 LOCK_FILE = "uv.lock"
 PYPROJECT = "pyproject.toml"
-# Runs on the merged, unreviewed pyproject.toml, possibly holding a write token: never build an sdist (its
-# build code would run). A resolution that needs a build fails into LOCK_FAILED and keeps the hub's lock.
-UV_LOCK = ["uv", "lock", "--no-build"]
 _CHANGELOG_HEADING = re.compile(r"^## \[?(\d+\.\d+\.\d+)", re.MULTILINE)
 
 
@@ -150,7 +147,7 @@ def _merge(root: Path, path: str, base: Entry | None, target: Entry | None) -> O
 
 
 def _update_lock(root: Path, base: Entry | None, target: Entry | None, pyproject_changed: bool) -> Outcome:
-    """Derived file: take the kit's lock if the hub never changed it, else regenerate it with `uv lock`."""
+    """Derived file: take the kit's lock if the hub never changed it, else keep the hub's and ask for a re-lock."""
     lock = root / LOCK_FILE
     try:
         ours = lock.read_bytes() if lock.is_file() else None
@@ -161,20 +158,7 @@ def _update_lock(root: Path, base: Entry | None, target: Entry | None, pyproject
         return _merge(root, LOCK_FILE, base, target)
     if base == target and not pyproject_changed:
         return Outcome(LOCK_FILE, "unchanged")
-    try:
-        done = subprocess.run(UV_LOCK, cwd=root, capture_output=True, check=False)
-        ok = done.returncode == 0
-    except OSError:
-        ok = False
-    now = lock.read_bytes() if lock.is_file() else None
-    if not ok:
-        if now != ours:  # put the hub's copy back exactly as it was
-            if ours is None:
-                lock.unlink()
-            else:
-                lock.write_bytes(ours)
-        return Outcome(LOCK_FILE, "kept", reason=LOCK_FAILED)
-    return Outcome(LOCK_FILE, "unchanged" if now == ours else "updated")
+    return Outcome(LOCK_FILE, "kept", reason=LOCK_RELOCK)
 
 
 def _finish(root: Path, result: UpdateResult) -> None:
@@ -232,8 +216,11 @@ def format_summary(result: UpdateResult) -> str:
         out += [f"- `{o.path}` ({_plural(o.conflicts, 'conflict')})" for o in conflicts] + [""]
         out += [WEB_EDITOR_HINT, ""]
     kept = [o for o in result.outcomes if o.action == "kept"]
+    if any(o.reason == LOCK_RELOCK for o in kept):
+        out += [LOCK_RELOCK_NOTE, ""]
     if kept:
-        out += ["### Files left alone", ""] + [f"- `{o.path}`: {o.reason}" for o in kept] + [""]
+        ordered = sorted(kept, key=lambda o: o.reason != LOCK_RELOCK)
+        out += ["### Files left alone", ""] + [f"- `{o.path}`: {o.reason}" for o in ordered] + [""]
     if result.pending_workflows:
         out += ["### Pending workflow files", "", "These workflow files were not updated (no token could write them):"]
         out += [""]

@@ -47,7 +47,7 @@ jobs:
           set -euo pipefail
 
           # Only the git calls that talk to this hub's remote get the token, through the environment (never argv,
-          # never echoed); the updater runs without GH_TOKEN, so nothing it starts (such as `uv lock`) can read it.
+          # never echoed); the updater runs without GH_TOKEN, so nothing it starts can read it (defence in depth).
           auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
           git_auth() {
             GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="http.${GITHUB_SERVER_URL}/.extraheader" GIT_CONFIG_VALUE_0="$auth" git "$@"
