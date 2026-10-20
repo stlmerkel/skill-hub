@@ -65,6 +65,9 @@ def _target(root: Path, path: str) -> Path:
     parts = PurePosixPath(path).parts
     if not parts or path.startswith("/") or "\\" in path or ".." in parts:
         raise _Kept(UNSAFE_PATH)
+    # A kit tree must never write git's own files: a hook there would run on the next commit.
+    if any(part.casefold() == ".git" for part in parts):
+        raise _Kept(UNSAFE_PATH)
     current = root
     for part in parts[:-1]:
         current = current / part

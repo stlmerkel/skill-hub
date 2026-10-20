@@ -149,3 +149,16 @@ def test_script_keeps_the_spec_decisions():
     assert "--force-with-lease" in run
     assert "--label kit-update" in run
     assert "Allow GitHub Actions to create and approve pull requests" in run
+
+
+def test_commit_never_runs_hooks():
+    # A hook in the hub's .git would run with the token in this step's environment.
+    assert "-c core.hooksPath=/dev/null" in script()
+    assert "commit --no-verify" in script()
+
+
+def test_open_update_pr_found_by_branch_or_label():
+    # An adopter may remove the label; the kit-update/ branch still marks the PR.
+    run = script()
+    assert 'startswith("kit-update/")' in run
+    assert '.name == "kit-update"' in run

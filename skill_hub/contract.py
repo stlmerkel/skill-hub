@@ -30,7 +30,7 @@ HUB_OWNED_PATHS: tuple[str, ...] = (
     ".claude-plugin/marketplace.json",
     ".cursor-plugin/marketplace.json",
 )
-# The kit's own Release Please stream (kit-owned, never copied into a hub).
+# The kit's own Release Please stream: kit-owned, so hubs receive both files, but only the kit repo runs it.
 KIT_RELEASE_CONFIG = "kit-release-please-config.json"
 KIT_RELEASE_MANIFEST = ".kit-release-please-manifest.json"
 # Regenerated from other files, never merged.

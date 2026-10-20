@@ -106,14 +106,12 @@ def run_update(
         else:
             result.outcomes.append(_merge(root, path, base.get(path), new.get(path)))
     if LOCK_FILE in base or LOCK_FILE in new:
-        pyproject = next((o for o in result.outcomes if o.path == PYPROJECT), None)
-        pyproject_changed = pyproject is not None and pyproject.action in {"updated", "added", "conflict"}
+        pyproject_changed = base.get(PYPROJECT) != new.get(PYPROJECT)
         result.outcomes.append(_update_lock(root, base.get(LOCK_FILE), new.get(LOCK_FILE), pyproject_changed))
 
-    if skip_workflows and kit.pending:
-        pair = (kit.workflows_version, kit.workflows_commit)
-    elif skip_workflows and result.pending_workflows:  # equal workflow files make the target a correct base
-        pair = (kit.version, tags[current])
+    # Pending only while some workflow file differs: equal workflow files make the target a correct base.
+    if skip_workflows and result.pending_workflows:
+        pair = (kit.workflows_version, kit.workflows_commit) if kit.pending else (kit.version, tags[current])
     else:
         pair = ("", "")
     write_kit_file(root, KitFile(kit.repo, result.to_version, tags[target], *pair))

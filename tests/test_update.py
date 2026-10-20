@@ -373,6 +373,30 @@ def test_uv_lock_hub_and_kit_both_changed_keeps_hub_and_asks_for_relock(tmp_path
     assert f"- `uv.lock`: {update.LOCK_RELOCK}" in summary
 
 
+def test_uv_lock_kit_changed_pyproject_hub_already_matches_asks_for_relock(tmp_path, monkeypatch):
+    _forbid_subprocess(monkeypatch)
+    kit2 = b"[project]\nname = 'kit2'\n"
+    releases = [("1.0.0", _lock_releases()[0][1]), ("1.1.0", {"pyproject.toml": kit2})]
+    _, hub = build(tmp_path, releases)
+    commit_files(hub, {"uv.lock": b"lock hub\n", "pyproject.toml": kit2}, "lock")
+    result = run_update(hub)
+    outcome = _outcome(result, "uv.lock")
+    assert (outcome.action, outcome.reason) == ("kept", update.LOCK_RELOCK)
+
+
+def test_skip_workflows_clears_pending_when_kit_returns_to_the_pending_base(tmp_path):
+    releases = [("1.0.0", kit_a()), ("1.1.0", {".github/workflows/qa.yml": QA_B})]
+    _, hub = build(tmp_path, releases)
+    run_update(hub, skip_workflows=True)
+    commit_files(hub, {}, "update 1.1.0")
+    assert read_kit_file(hub).pending
+    release(tmp_path, "1.2.0", {".github/workflows/qa.yml": QA_A})
+    result = run_update(hub, skip_workflows=True)
+    assert result.pending_workflows == []
+    kit = read_kit_file(hub)
+    assert (kit.version, kit.pending) == ("1.2.0", False)
+
+
 def test_skip_workflows_without_workflow_changes_is_not_pending(tmp_path):
     _, hub = build(tmp_path, [("1.0.0", kit_a()), ("1.1.0", {"skill_hub/new.py": b"NEW = True\n"})])
     result = run_update(hub, skip_workflows=True)

@@ -19,7 +19,10 @@ kit_only = pytest.mark.skipif(os.environ.get("SKILL_HUB_KIT_RELEASES") != "true"
 
 
 def kit_config() -> dict:
-    return json.loads((ROOT / KIT_RELEASE_CONFIG).read_text(encoding="utf-8"))
+    path = ROOT / KIT_RELEASE_CONFIG
+    if not path.is_file():
+        pytest.skip("this hub has deleted the kit release config")
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def test_kit_config_and_manifest_names():
