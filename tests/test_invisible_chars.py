@@ -16,7 +16,7 @@ from skill_hub.releases import RELEASE_CONFIG, RELEASE_MANIFEST
 
 ROOT = Path(__file__).parent.parent
 BOM = b"\xef\xbb\xbf"
-ADOPTER_FILES = {HUB_FILE, RELEASE_CONFIG, RELEASE_MANIFEST, *MANIFEST_PATHS}
+ADOPTER_FILES = {HUB_FILE, "README.md", RELEASE_CONFIG, RELEASE_MANIFEST, *MANIFEST_PATHS}
 
 
 def test_no_literal_bom_in_tracked_files():
