@@ -334,6 +334,12 @@ def test_s17_reserved_plugin_name_is_a_warning(tmp_path):
     assert findings[0].message == expected
 
 
+def test_s18_reserved_skill_name(tmp_path):
+    findings = run(tmp_path, skill_md("kit"), dirname="kit")
+    assert ids(findings) == ["S18"] and findings[0].level == "error"
+    assert findings[0].message == "skill name kit is reserved for the kit's own release tags"
+
+
 def test_s5_lone_surrogate_description_is_an_error_without_echo(tmp_path):
     escape = "\\" + "ud800"  # built by concatenation so no tool turns it into a character (L72)
     text = skill_md().replace('description: "Formats', f'description: "bad {escape} Formats')

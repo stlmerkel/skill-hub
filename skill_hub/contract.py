@@ -16,6 +16,28 @@ DEFAULT_REPO_URL = "https://github.com/you/your-hub"
 
 HUB_FILE = "hub.yml"
 
+# Template updates: the file that records a hub's kit release, and the kit's release-tag shape.
+KIT_FILE = ".skill-hub/kit.yml"
+KIT_TAG_PREFIX = "kit-v"
+WORKFLOWS_DIR = ".github/workflows/"
+
+# Paths a hub owns: an update never touches them. A trailing "/" marks a folder.
+HUB_OWNED_PATHS: tuple[str, ...] = (
+    "README.md",
+    "skills/",
+    "release-please-config.json",
+    ".release-please-manifest.json",
+    ".claude-plugin/marketplace.json",
+    ".cursor-plugin/marketplace.json",
+)
+# The kit's own Release Please stream (kit-owned, never copied into a hub).
+KIT_RELEASE_CONFIG = "kit-release-please-config.json"
+KIT_RELEASE_MANIFEST = ".kit-release-please-manifest.json"
+# Regenerated from other files, never merged.
+DERIVED_PATHS = frozenset({"uv.lock"})
+# Skill names the kit keeps for itself: `kit` would collide with the kit's own release tags.
+RESERVED_SKILL_NAMES = frozenset({"kit"})
+
 # Written by `skill-hub new-skill` and flagged by QA check S14 until replaced.
 SCAFFOLD_DESCRIPTION = "TODO: say what this skill does and when an agent should use it."
 
@@ -35,6 +57,39 @@ _SEMVER_RE = re.compile(
 
 def is_valid_name(value: str) -> bool:
     return 1 <= len(value) <= NAME_MAX and _NAME_RE.fullmatch(value) is not None
+
+
+def is_hub_owned(path: str) -> bool:
+    return any(
+        path.startswith(owned) if owned.endswith("/") else path == owned for owned in HUB_OWNED_PATHS
+    )
+
+
+_PLAIN_VERSION_RE = re.compile(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)", re.ASCII)
+
+
+def parse_version(value: str) -> tuple[int, int, int] | None:
+    """`X.Y.Z` with no leading zeros and no suffix, as a tuple, else None."""
+    match = _PLAIN_VERSION_RE.fullmatch(value)
+    return None if match is None else (int(match[1]), int(match[2]), int(match[3]))
+
+
+def parse_kit_tag(tag: str) -> tuple[int, int, int] | None:
+    return parse_version(tag[len(KIT_TAG_PREFIX) :]) if tag.startswith(KIT_TAG_PREFIX) else None
+
+
+def is_valid_kit_repo(value: str) -> bool:
+    """An https:// or file:// location: never an option-like string, and no whitespace, control, quote or backslash."""
+    if '"' in value or "\\" in value or any(ord(char) <= 0x20 or ord(char) == 0x7F for char in value):
+        return False
+    return any(value.startswith(scheme) and len(value) > len(scheme) for scheme in (_HTTPS, "file://"))
+
+
+_COMMIT_RE = re.compile(r"[0-9a-f]{40}", re.ASCII)
+
+
+def is_valid_commit(value: str) -> bool:
+    return _COMMIT_RE.fullmatch(value) is not None
 
 
 def is_valid_semver(value: str) -> bool:

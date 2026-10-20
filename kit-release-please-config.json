@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "simple",
+  "include-component-in-tag": true,
+  "bump-minor-pre-major": false,
+  "label": "autorelease: kit-pending",
+  "release-label": "autorelease: kit-tagged",
+  "snapshot-label": "autorelease: kit-snapshot",
+  "packages": {
+    ".": {
+      "component": "kit",
+      "changelog-path": "CHANGELOG.md",
+      "release-as": "1.0.0",
+      "exclude-paths": [
+        "skills",
+        ".claude-plugin",
+        ".cursor-plugin"
+      ],
+      "extra-files": [
+        ".skill-hub/kit.yml"
+      ]
+    }
+  }
+}

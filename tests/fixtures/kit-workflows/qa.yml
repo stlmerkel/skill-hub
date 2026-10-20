@@ -1,0 +1,92 @@
+name: QA
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: uv sync --locked
+      - run: uv run --locked ruff check
+      - run: uv run --locked pytest
+        env:
+          SKILL_HUB_KIT_RELEASES: ${{ vars.SKILL_HUB_KIT_RELEASES }}
+      - run: uv run --locked skill-hub qa
+
+  build:
+    needs: qa
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      target: ${{ steps.deploy.outputs.target }}
+      s3_bucket: ${{ steps.deploy.outputs.s3_bucket }}
+      s3_endpoint: ${{ steps.deploy.outputs.s3_endpoint }}
+      s3_region: ${{ steps.deploy.outputs.s3_region }}
+      rsync_host: ${{ steps.deploy.outputs.rsync_host }}
+      rsync_user: ${{ steps.deploy.outputs.rsync_user }}
+      rsync_path: ${{ steps.deploy.outputs.rsync_path }}
+      rsync_port: ${{ steps.deploy.outputs.rsync_port }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.11"
+      - run: uv sync --locked
+      - run: uv run --locked skill-hub build
+      - id: deploy
+        run: uv run --locked skill-hub deploy-config --github-output
+      - uses: actions/upload-artifact@v7
+        with:
+          name: marketplace-page
+          path: site/
+          if-no-files-found: error
+
+  # One job per deploy target. Each runs only when hub.yml's deploy.target names it, and
+  # receives only its own target's secrets. With no target, all three are skipped.
+  deploy-github-pages:
+    needs: build
+    if: needs.build.outputs.target == 'github-pages'
+    permissions:
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/deploy-github-pages.yml
+
+  deploy-s3:
+    needs: build
+    if: needs.build.outputs.target == 's3'
+    permissions: {}
+    uses: ./.github/workflows/deploy-s3.yml
+    with:
+      bucket: ${{ needs.build.outputs.s3_bucket }}
+      endpoint: ${{ needs.build.outputs.s3_endpoint }}
+      region: ${{ needs.build.outputs.s3_region }}
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  deploy-rsync:
+    needs: build
+    if: needs.build.outputs.target == 'rsync'
+    permissions: {}
+    uses: ./.github/workflows/deploy-rsync.yml
+    with:
+      host: ${{ needs.build.outputs.rsync_host }}
+      user: ${{ needs.build.outputs.rsync_user }}
+      path: ${{ needs.build.outputs.rsync_path }}
+      port: ${{ needs.build.outputs.rsync_port }}
+    secrets:
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}

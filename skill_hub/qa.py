@@ -1,5 +1,5 @@
 # skill_hub/qa.py
-"""Skill checks (S1-S17), run checks (R1-R7), and the QA runner."""
+"""Skill checks (S1-S18), run checks (R1-R7), and the QA runner."""
 
 import os
 import stat
@@ -11,7 +11,9 @@ from skill_hub.config import check_hub
 from skill_hub.contract import (
     COMPATIBILITY_MAX,
     DESCRIPTION_MAX,
+    KIT_FILE,
     NAME_RULE,
+    RESERVED_SKILL_NAMES,
     SCAFFOLD_DESCRIPTION,
     SPEC_KEYS,
     is_blank,
@@ -23,6 +25,7 @@ from skill_hub.contract import (
 )
 from skill_hub.findings import ERROR, WARNING, Finding
 from skill_hub.frontmatter import FRONTMATTER_LINE_OFFSET, FrontmatterError, split_frontmatter
+from skill_hub.kitfile import KitFileError, read_kit_file
 from skill_hub.manifests import check_manifests
 from skill_hub.releases import RELEASE_CONFIG, RELEASE_MANIFEST, VERSION_FILE, check_release
 from skill_hub.secrets import scan_text
@@ -49,6 +52,7 @@ class QaResult:
 def run_qa(root: Path) -> QaResult:
     findings, config = check_hub(root)
     allow_keys = config.allow_keys if config is not None else ()
+    findings.extend(_check_kit_file(root))
 
     skills_root = root / SKILLS_DIR
     if not skills_root.exists():
@@ -91,6 +95,25 @@ def run_qa(root: Path) -> QaResult:
     if config is not None and skills and not any(f.level == ERROR for f in findings):
         findings.extend(check_manifests(root, config))
     return QaResult(findings, len(skills))
+
+
+def _check_kit_file(root: Path) -> list[Finding]:
+    """H17: a kit.yml that cannot be read, or that records workflow files an update held back."""
+    # lstat, not Path.exists(): Python 3.11 re-raises PermissionError from exists().
+    try:
+        (root / KIT_FILE).lstat()
+    except FileNotFoundError:
+        return []
+    except OSError:
+        pass  # present but unreadable: read_kit_file below reports it
+    try:
+        kit = read_kit_file(root)
+    except KitFileError:
+        return [Finding(WARNING, "H17", KIT_FILE, "kit.yml could not be read; `skill-hub update` will refuse to run")]
+    if kit.pending:
+        message = "an update held back the workflow files; run `skill-hub update --workflows-only` to apply them"
+        return [Finding(WARNING, "H17", KIT_FILE, message)]
+    return []
 
 
 def check_skill(
@@ -173,6 +196,9 @@ def _check_fields(fm: dict, key_lines, dir_name: str, md: str, allow_keys: tuple
     if isinstance(name, str) and is_valid_name(name) and is_reserved_plugin_name(name):
         message = "name passes for one of Anthropic's own plugins; Claude Code's plugin validator rejects it"
         findings.append(Finding(WARNING, "S17", md, message))
+
+    if isinstance(name, str) and name in RESERVED_SKILL_NAMES:
+        error("S18", f"skill name {name} is reserved for the kit's own release tags")
 
     # S5 description
     description = fm.get("description")

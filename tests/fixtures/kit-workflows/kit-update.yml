@@ -1,0 +1,149 @@
+name: Kit update
+
+# Weekly and on demand: propose the newest kit release as one pull request, using this hub's own
+# locked skill-hub (decision 0007). KIT.md, "Updating your hub", explains the token and settings.
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      major:
+        description: "Allow a newer major kit release (can contain breaking changes)"
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: kit-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    # The kit repo itself (which sets SKILL_HUB_KIT_RELEASES) has nothing to update from; hubs never set it.
+    if: vars.SKILL_HUB_KIT_RELEASES != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.KIT_UPDATE_TOKEN || github.token }}
+          # The update runs code from an unreviewed kit release: keep the token out of .git/config.
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.11"
+      - run: uv sync --locked
+      - name: Propose the kit update
+        env:
+          GH_TOKEN: ${{ secrets.KIT_UPDATE_TOKEN || github.token }}
+          HAS_TOKEN: ${{ secrets.KIT_UPDATE_TOKEN != '' }}
+          MAJOR: ${{ inputs.major || false }}
+        run: |
+          set -euo pipefail
+
+          # Only the git calls that talk to this hub's remote get the token, through the environment (never argv,
+          # never echoed); the updater runs without GH_TOKEN, so nothing it starts can read it (defence in depth).
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git_auth() {
+            GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="http.${GITHUB_SERVER_URL}/.extraheader" GIT_CONFIG_VALUE_0="$auth" git "$@"
+          }
+
+          # 1. Ask the updater for the target release; --check fetches and writes nothing.
+          check_args=(--check --github-output)
+          if [ "$MAJOR" = "true" ]; then check_args+=(--major); fi
+          GITHUB_OUTPUT="$RUNNER_TEMP/check.out" env -u GH_TOKEN uv run --locked skill-hub update "${check_args[@]}"
+          target="$(sed -n 's/^target=//p' "$RUNNER_TEMP/check.out")"
+          newer_major="$(sed -n 's/^newer_major=//p' "$RUNNER_TEMP/check.out")"
+
+          # 2. A newer major gets one issue, ever: search open and closed issues for the exact title first.
+          if [ -n "$newer_major" ]; then
+            title="skill-hub kit ${newer_major}.x is available"
+            # Issues may be disabled in this hub: warn and carry on, so the major notice never blocks a minor update.
+            if ! titles="$(gh issue list --state all --search "$title in:title" --limit 100 --json title --jq '.[].title')"; then
+              echo "warning: could not search issues (are Issues enabled?); skipping the kit ${newer_major}.x notice" >&2
+            elif ! grep -Fxq "$title" <<<"$titles"; then
+              {
+                echo "skill-hub kit ${newer_major}.x is available. A new major release can contain breaking changes, so this hub is not updated to it automatically."
+                echo
+                echo 'To opt in, either:'
+                echo
+                echo '- run the "Kit update" workflow by hand (Actions, Kit update, Run workflow) with `major` ticked, or'
+                echo '- run `uv run skill-hub update --major` locally and open a pull request.'
+                echo
+                echo 'See CHANGELOG.md in the kit repository named in `.skill-hub/kit.yml` for what changed.'
+              } > "$RUNNER_TEMP/major.md"
+              if ! gh issue create --title "$title" --body-file "$RUNNER_TEMP/major.md"; then
+                echo "warning: could not open the kit ${newer_major}.x issue (are Issues enabled?); continuing" >&2
+              fi
+            fi
+          fi
+
+          # 3. Nothing newer within reach: done.
+          if [ -z "$target" ]; then
+            echo "No kit update available."
+            exit 0
+          fi
+          branch="kit-update/v${target}"
+
+          # 4. One update at a time: an open update PR's branch is never touched.
+          open_pr="$(gh pr list --state open --label kit-update --limit 1 --json number --jq '.[].number')"
+          if [ -n "$open_pr" ]; then
+            open_head="$(gh pr view "$open_pr" --json headRefName --jq '.headRefName')"
+            # The open PR proposes an older release: say so once per version, then stop.
+            if [ "$open_head" != "$branch" ]; then
+              marker="kit-update: v${target} available"
+              comments="$(gh pr view "$open_pr" --json comments --jq '.comments[].body')"
+              if ! grep -Fq "$marker" <<<"$comments"; then
+                printf 'Kit v%s is available. Merge or close this pull request and the next run proposes v%s.\n\n<!-- %s -->\n' \
+                  "$target" "$target" "$marker" > "$RUNNER_TEMP/comment.md"
+                gh pr comment "$open_pr" --body-file "$RUNNER_TEMP/comment.md"
+              fi
+            fi
+            echo "An update pull request is already open (#$open_pr); leaving it alone."
+            exit 0
+          fi
+
+          # 5. A closed, unmerged PR for this version means the adopter declined it: never reopen it.
+          declined="$(gh pr list --state closed --head "$branch" --json mergedAt --jq '[.[] | select(.mergedAt == null)] | length')"
+          if [ "$declined" != "0" ]; then
+            echo "Kit v${target} was declined (its pull request was closed without merging); waiting for a newer release."
+            exit 0
+          fi
+
+          # 6. Run the update. Without KIT_UPDATE_TOKEN, github.token cannot push workflow files: leave them pending.
+          update_args=(--github-output --summary-file "$RUNNER_TEMP/body.md")
+          if [ "$HAS_TOKEN" != "true" ]; then update_args+=(--skip-workflows); fi
+          if [ "$MAJOR" = "true" ]; then update_args+=(--major); fi
+          GITHUB_OUTPUT="$RUNNER_TEMP/update.out" env -u GH_TOKEN uv run --locked skill-hub update "${update_args[@]}"
+          applied="$(sed -n 's/^target=//p' "$RUNNER_TEMP/update.out")"
+          # The checks above were for $target; a release published mid-run would need them redone.
+          if [ "$applied" != "$target" ]; then
+            echo "error: the kit release changed during this run (checked v${target}, got v${applied}); run the workflow again" >&2
+            exit 1
+          fi
+
+          # 7. Commit everything, conflict markers included, on a branch this run creates, and open the PR.
+          git switch -c "$branch"
+          git add -A
+          git -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "chore: update skill-hub kit to v${target}"
+          # A branch left by an earlier run that failed before its PR opened belongs to no open or declined PR
+          # (steps 4 and 5), so overwrite it, leasing against the SHA seen now; the shallow checkout has no
+          # remote-tracking ref, and a plain lease would expect the branch to be absent.
+          remote_sha="$(git_auth ls-remote origin "refs/heads/$branch" | cut -f1)"
+          if [ -n "$remote_sha" ]; then
+            git_auth push --force-with-lease="refs/heads/$branch:$remote_sha" origin "$branch"
+          else
+            git_auth push --force-with-lease origin "$branch"
+          fi
+          gh label create kit-update --force --color 0e8a16 --description "Kit update pull request"
+          if ! gh pr create --head "$branch" --title "Update skill-hub kit to v${target}" --label kit-update --body-file "$RUNNER_TEMP/body.md"; then
+            echo 'error: could not open the pull request. Enable Settings > Actions > General > "Allow GitHub Actions to create and approve pull requests", then run this workflow again.' >&2
+            exit 1
+          fi

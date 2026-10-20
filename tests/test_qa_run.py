@@ -112,3 +112,52 @@ def test_unstatable_skills_entries_are_s13(tmp_path):
         skills.chmod(0o755)
     found = sorted((f.check_id, f.path) for f in result.findings)
     assert found == [("R2", "skills"), ("S13", "skills/changelog-formatter")]
+
+
+def _hub_with_kit_file(tmp_path, text):
+    write_hub(tmp_path)
+    make_skill(tmp_path)
+    sync_manifests(tmp_path)
+    kit = tmp_path / ".skill-hub" / "kit.yml"
+    kit.parent.mkdir()
+    kit.write_text(text, encoding="utf-8")
+
+
+def test_h17_pending_workflows_warns(tmp_path):
+    text = (
+        'repo: "https://github.com/acme/kit"\nversion: "1.1.0"\ncommit: "' + "a" * 40 + '"\n'
+        'workflows_version: "1.0.0"\nworkflows_commit: "' + "b" * 40 + '"\n'
+    )
+    _hub_with_kit_file(tmp_path, text)
+    result = run_qa(tmp_path)
+    assert ids(result.findings) == ["H17"] and result.warnings and not result.errors
+
+
+def test_h17_unreadable_kit_file_warns(tmp_path):
+    _hub_with_kit_file(tmp_path, "a: [")
+    result = run_qa(tmp_path)
+    assert ids(result.findings) == ["H17"] and result.warnings and not result.errors
+
+
+def test_no_kit_file_no_h17(tmp_path):
+    write_hub(tmp_path)
+    make_skill(tmp_path)
+    sync_manifests(tmp_path)
+    assert run_qa(tmp_path).findings == []
+
+
+def test_current_kit_file_has_no_h17(tmp_path):
+    _hub_with_kit_file(tmp_path, 'repo: "https://github.com/acme/kit"\nversion: "1.1.0"\n')
+    assert run_qa(tmp_path).findings == []
+
+
+@pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="permissions not enforced")
+def test_h17_unsearchable_kit_folder_warns(tmp_path):
+    _hub_with_kit_file(tmp_path, 'repo: "https://github.com/acme/kit"\nversion: "1.1.0"\n')
+    folder = tmp_path / ".skill-hub"
+    folder.chmod(0o644)
+    try:
+        result = run_qa(tmp_path)
+    finally:
+        folder.chmod(0o755)
+    assert ids(result.findings) == ["H17"] and not result.errors

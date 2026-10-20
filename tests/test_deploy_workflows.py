@@ -11,7 +11,10 @@ import yaml
 from skill_hub.contract import DEPLOY_TARGET_SETTINGS
 
 REPO = Path(__file__).parent.parent
-WORKFLOWS = REPO / ".github" / "workflows"
+LIVE_WORKFLOWS = REPO / ".github" / "workflows"
+# Fixture copies of the kit's workflows, so a hub that deleted a deploy target still passes its own tests.
+# tests/test_kit_snapshots.py keeps the fixtures equal to the live files in the kit repo.
+WORKFLOWS = Path(__file__).parent / "fixtures" / "kit-workflows"
 TARGETS = tuple(DEPLOY_TARGET_SETTINGS)
 SECRETS = {
     "github-pages": (),
@@ -80,7 +83,7 @@ def test_build_job_exposes_every_deploy_output():
 def test_every_called_workflow_exists():
     for name, job in load("qa.yml")["jobs"].items():
         if "uses" in job:
-            assert (REPO / job["uses"]).is_file(), name
+            assert (WORKFLOWS / Path(job["uses"]).name).is_file(), name
 
 
 @pytest.mark.parametrize("target", TARGETS)
@@ -128,9 +131,11 @@ def test_pages_deploy_uses_the_github_pages_environment():
     }
 
 
-@pytest.mark.parametrize("name", ["qa.yml", *(f"deploy-{target}.yml" for target in TARGETS)])
+@pytest.mark.parametrize("name", sorted(path.name for path in LIVE_WORKFLOWS.glob("*.yml")))
 def test_no_expression_inside_a_run_script(name):
-    for job in load(name)["jobs"].values():
+    # Safety lint: reads the live workflows, so it holds in a hub too.
+    live = yaml.safe_load((LIVE_WORKFLOWS / name).read_text(encoding="utf-8"))
+    for job in live["jobs"].values():
         for step in job.get("steps", []):
             assert "${{" not in step.get("run", ""), step.get("name", step.get("run"))
 
