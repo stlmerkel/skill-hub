@@ -90,8 +90,10 @@ jobs:
           fi
           branch="kit-update/v${target}"
 
-          # 4. One update at a time: an open update PR's branch is never touched.
-          open_pr="$(gh pr list --state open --label kit-update --limit 1 --json number --jq '.[].number')"
+          # 4. One update at a time: an open update PR's branch is never touched. Match the branch as well as the
+          # label, which an adopter may remove.
+          open_pr="$(gh pr list --state open --limit 100 --json number,headRefName,labels \
+            --jq '[.[] | select((.headRefName | startswith("kit-update/")) or any(.labels[]; .name == "kit-update"))][0].number // empty')"
           if [ -n "$open_pr" ]; then
             open_head="$(gh pr view "$open_pr" --json headRefName --jq '.headRefName')"
             # The open PR proposes an older release: say so once per version, then stop.
@@ -129,10 +131,12 @@ jobs:
 
           # 7. Commit everything, conflict markers included, on a branch this run creates, and open the PR.
           git switch -c "$branch"
+          # Hooks never run here: the token is in this step's environment.
           git add -A
           git -c user.name="github-actions[bot]" \
             -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-            commit -m "chore: update skill-hub kit to v${target}"
+            -c core.hooksPath=/dev/null \
+            commit --no-verify -m "chore: update skill-hub kit to v${target}"
           # A branch left by an earlier run that failed before its PR opened belongs to no open or declined PR
           # (steps 4 and 5), so overwrite it, leasing against the SHA seen now; the shallow checkout has no
           # remote-tracking ref, and a plain lease would expect the branch to be absent.
