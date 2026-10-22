@@ -117,34 +117,60 @@ jobs:
             exit 0
           fi
 
-          # 6. Run the update. Without KIT_UPDATE_TOKEN, github.token cannot push workflow files: leave them pending.
-          update_args=(--github-output --summary-file "$RUNNER_TEMP/body.md")
-          if [ "$HAS_TOKEN" != "true" ]; then update_args+=(--skip-workflows); fi
-          if [ "$MAJOR" = "true" ]; then update_args+=(--major); fi
-          GITHUB_OUTPUT="$RUNNER_TEMP/update.out" env -u GH_TOKEN uv run --locked skill-hub update "${update_args[@]}"
-          applied="$(sed -n 's/^target=//p' "$RUNNER_TEMP/update.out")"
-          # The checks above were for $target; a release published mid-run would need them redone.
-          if [ "$applied" != "$target" ]; then
-            echo "error: the kit release changed during this run (checked v${target}, got v${applied}); run the workflow again" >&2
-            exit 1
-          fi
-
-          # 7. Commit everything, conflict markers included, on a branch this run creates, and open the PR.
-          git switch -c "$branch"
-          # Hooks never run here: the token is in this step's environment.
-          git add -A
-          git -c user.name="github-actions[bot]" \
-            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-            -c core.hooksPath=/dev/null \
-            commit --no-verify -m "chore: update skill-hub kit to v${target}"
+          # 6. The update and the push, as functions: a push the token is refused redoes the update (step 7).
+          # Without KIT_UPDATE_TOKEN, github.token cannot push workflow files: leave them pending.
+          skip_workflows="false"
+          if [ "$HAS_TOKEN" != "true" ]; then skip_workflows="true"; fi
+          run_update() {
+            update_args=(--github-output --summary-file "$RUNNER_TEMP/body.md")
+            if [ "$skip_workflows" = "true" ]; then update_args+=(--skip-workflows); fi
+            if [ "$MAJOR" = "true" ]; then update_args+=(--major); fi
+            # --github-output appends, so a second run must start from an empty file.
+            rm -f "$RUNNER_TEMP/update.out"
+            GITHUB_OUTPUT="$RUNNER_TEMP/update.out" env -u GH_TOKEN uv run --locked skill-hub update "${update_args[@]}"
+            applied="$(sed -n 's/^target=//p' "$RUNNER_TEMP/update.out")"
+            # The checks above were for $target; a release published mid-run would need them redone.
+            if [ "$applied" != "$target" ]; then
+              echo "error: the kit release changed during this run (checked v${target}, got v${applied}); run the workflow again" >&2
+              exit 1
+            fi
+            # Commit everything, conflict markers included. Hooks never run here: the token is in this step's environment.
+            git add -A
+            git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              -c core.hooksPath=/dev/null \
+              commit --no-verify -m "chore: update skill-hub kit to v${target}"
+          }
           # A branch left by an earlier run that failed before its PR opened belongs to no open or declined PR
           # (steps 4 and 5), so overwrite it, leasing against the SHA seen now; the shallow checkout has no
           # remote-tracking ref, and a plain lease would expect the branch to be absent.
-          remote_sha="$(git_auth ls-remote origin "refs/heads/$branch" | cut -f1)"
-          if [ -n "$remote_sha" ]; then
-            git_auth push --force-with-lease="refs/heads/$branch:$remote_sha" origin "$branch"
-          else
-            git_auth push --force-with-lease origin "$branch"
+          push_branch() {
+            remote_sha="$(git_auth ls-remote origin "refs/heads/$branch" | cut -f1)"
+            if [ -n "$remote_sha" ]; then
+              git_auth push --force-with-lease="refs/heads/$branch:$remote_sha" origin "$branch"
+            else
+              git_auth push --force-with-lease origin "$branch"
+            fi
+          }
+
+          # 7. Update on a branch this run creates, push it and open the PR.
+          base_sha="$(git rev-parse HEAD)"
+          git switch -c "$branch"
+          run_update
+          if ! push_branch 2>"$RUNNER_TEMP/push.err"; then
+            cat "$RUNNER_TEMP/push.err" >&2
+            # A KIT_UPDATE_TOKEN without the Workflows permission is refused once the commit changes a workflow
+            # file. Redo the update with the workflow files left pending, as if there were no token.
+            if [ "$skip_workflows" = "true" ] || ! grep -q "refusing to allow .* to create or update workflow" "$RUNNER_TEMP/push.err"; then
+              exit 1
+            fi
+            echo "::warning::KIT_UPDATE_TOKEN lacks the Workflows permission; the workflow files are left pending"
+            git reset --hard "$base_sha"
+            git clean -fd
+            skip_workflows="true"
+            run_update
+            push_branch
+            printf '\n> [!WARNING]\n> `KIT_UPDATE_TOKEN` lacks the Workflows permission, so this update leaves the workflow files pending. Give it that permission (KIT.md, "The optional `KIT_UPDATE_TOKEN`").\n' >> "$RUNNER_TEMP/body.md"
           fi
           gh label create kit-update --force --color 0e8a16 --description "Kit update pull request"
           if ! gh pr create --head "$branch" --title "Update skill-hub kit to v${target}" --label kit-update --body-file "$RUNNER_TEMP/body.md"; then

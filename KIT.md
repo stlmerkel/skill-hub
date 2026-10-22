@@ -272,6 +272,8 @@ To have the PR include workflow files and start its checks without approval, cre
 - **A fine-grained personal access token** limited to your hub repository, with read and write access to Contents, Pull requests, Issues and Workflows.
 - **A GitHub App token** with the same four permissions.
 
+If the token lacks the Workflows permission, GitHub refuses the push. The workflow then runs the update again without the workflow files, leaves them pending as if there were no token, and says so at the top of the PR body. Give the token that permission to stop the warning.
+
 ### Which updater runs
 
 The workflow runs your hub's own `skill-hub`, from the code already in your repository and locked by `uv.lock`, never code from the release it is fetching. That keeps what runs reviewed by you. The consequence: a fix to the updater itself reaches your hub in one update and takes effect from the next one.
