@@ -1,13 +1,18 @@
-"""Guard the kit-update workflow's shape: triggers, least privilege, token fallback, pins and the locked updater.
+"""Guard the kit-update workflow: triggers, least privilege, token fallback, pins, locked updater, push fallback.
 
 Reads the fixture copy, like tests/test_deploy_workflows.py: a hub without KIT_UPDATE_TOKEN receives this test
 before its live workflow (pending workflow files), and tests/test_kit_snapshots.py keeps the fixture equal to the
 live file in the kit repo. PyYAML reads the `on:` key as True.
 """
 
+import os
+import subprocess
 from pathlib import Path
 
+import pytest
 import yaml
+
+from tests.kitrepo import git
 
 WORKFLOWS = Path(__file__).parent / "fixtures" / "kit-workflows"
 TOKEN = "${{ secrets.KIT_UPDATE_TOKEN || github.token }}"
@@ -162,3 +167,114 @@ def test_open_update_pr_found_by_branch_or_label():
     run = script()
     assert 'startswith("kit-update/")' in run
     assert '.name == "kit-update"' in run
+
+
+# Behaviour of the script's push fallback, run for real: stub `uv` (the updater) and `gh`, and a local remote whose
+# pre-receive hook refuses workflow changes with GitHub's message for a token without the Workflows permission.
+FAKE_UV = """#!/bin/bash
+# uv run --locked skill-hub update ARGS: record the call, touch README.md and, unless skipped, a workflow file.
+[ -z "${GH_TOKEN:-}" ] || exit 9
+shift 4
+summary="" skip=no check=no
+while [ $# -gt 0 ]; do
+  case "$1" in --summary-file) summary="$2"; shift ;; --skip-workflows) skip=yes ;; --check) check=yes ;; esac
+  shift
+done
+echo "target=1.2.0" >> "$GITHUB_OUTPUT"
+if [ "$check" = yes ]; then echo "newer_major=" >> "$GITHUB_OUTPUT"; exit 0; fi
+echo "$skip" >> "$LOG/updates"
+echo "kit 1.2.0" >> README.md
+if [ "$skip" = no ]; then echo "# kit 1.2.0" >> .github/workflows/qa.yml; fi
+echo "body skip=$skip" > "$summary"
+"""
+FAKE_GH = """#!/bin/bash
+case "$*" in
+  "pr list --state closed"*) echo 0 ;;
+  "pr create"*) while [ $# -gt 0 ]; do [ "$1" = --body-file ] && cp "$2" "$LOG/pr-body.md"; shift; done ;;
+esac
+"""
+REFUSE_WORKFLOWS = """#!/bin/sh
+while read old new ref; do
+  if git diff --name-only "$new^" "$new" | grep -q '^.github/workflows/'; then
+    echo "refusing to allow a Personal Access Token to create or update workflow .github/workflows/qa.yml" >&2
+    exit 1
+  fi
+done
+"""
+REFUSE_ALL = """#!/bin/sh
+echo "pre-receive hook declined" >&2
+exit 1
+"""
+REFUSE_ALL_AS_WORKFLOWS = """#!/bin/sh
+echo "refusing to allow a Personal Access Token to create or update workflow .github/workflows/qa.yml" >&2
+exit 1
+"""
+
+
+def run_script(tmp_path: Path, has_token: str, hook: str | None) -> tuple[subprocess.CompletedProcess, Path, Path]:
+    remote, hub, stubs, log, runner = (tmp_path / name for name in ("remote.git", "hub", "bin", "log", "runner"))
+    for folder in (hub / ".github" / "workflows", stubs, log, runner):
+        folder.mkdir(parents=True)
+    git(tmp_path, "init", "-q", "--bare", str(remote))
+    git(hub, "init", "-q", "-b", "main")
+    (hub / "README.md").write_text("hub\n")
+    (hub / ".github" / "workflows" / "qa.yml").write_text("name: QA\n")
+    git(hub, "add", "-A")
+    git(hub, "commit", "-q", "-m", "init")
+    git(hub, "remote", "add", "origin", str(remote))
+    git(hub, "push", "-q", "origin", "main")
+    for path, text in ((stubs / "uv", FAKE_UV), (stubs / "gh", FAKE_GH)) + (
+        ((remote / "hooks" / "pre-receive", hook),) if hook else ()
+    ):
+        path.write_text(text)
+        path.chmod(0o755)
+    (tmp_path / "script.sh").write_text(script())
+    env = {
+        **os.environ,
+        "PATH": f"{stubs}{os.pathsep}{os.environ['PATH']}",
+        "GH_TOKEN": "secret",
+        "HAS_TOKEN": has_token,
+        "MAJOR": "false",
+        "RUNNER_TEMP": str(runner),
+        "GITHUB_SERVER_URL": "https://github.com",
+        "LOG": str(log),
+        "GIT_CONFIG_COUNT": "2",
+        "GIT_CONFIG_KEY_0": "user.name",
+        "GIT_CONFIG_VALUE_0": "Test",
+        "GIT_CONFIG_KEY_1": "commit.gpgsign",
+        "GIT_CONFIG_VALUE_1": "false",
+    }
+    done = subprocess.run(["bash", str(tmp_path / "script.sh")], cwd=hub, env=env, capture_output=True, text=True)
+    return done, remote, log
+
+
+def pushed_files(remote: Path) -> list[str]:
+    return git(remote, "diff", "--name-only", "main", "kit-update/v1.2.0").splitlines()
+
+
+def test_token_without_workflows_permission_falls_back_to_pending(tmp_path):
+    done, remote, log = run_script(tmp_path, "true", REFUSE_WORKFLOWS)
+    assert done.returncode == 0, done.stderr
+    assert (log / "updates").read_text().split() == ["no", "yes"]
+    assert pushed_files(remote) == ["README.md"]
+    body = (log / "pr-body.md").read_text()
+    assert body.startswith("body skip=yes\n")
+    assert "lacks the Workflows permission" in body
+    assert "::warning::KIT_UPDATE_TOKEN lacks the Workflows permission" in done.stdout
+
+
+def test_token_with_workflows_permission_pushes_workflow_files(tmp_path):
+    done, remote, log = run_script(tmp_path, "true", None)
+    assert done.returncode == 0, done.stderr
+    assert (log / "updates").read_text().split() == ["no"]
+    assert pushed_files(remote) == [".github/workflows/qa.yml", "README.md"]
+    assert "Workflows permission" not in (log / "pr-body.md").read_text()
+
+
+@pytest.mark.parametrize(("has_token", "hook"), [("true", REFUSE_ALL), ("false", REFUSE_ALL_AS_WORKFLOWS)])
+def test_other_push_failures_never_retry(tmp_path, has_token, hook):
+    # Any other refusal, or a workflow refusal when the workflow files were already skipped, fails the run once.
+    done, remote, log = run_script(tmp_path, has_token, hook)
+    assert done.returncode != 0
+    assert len((log / "updates").read_text().split()) == 1
+    assert not (log / "pr-body.md").exists()

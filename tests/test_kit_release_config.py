@@ -86,5 +86,17 @@ def test_kit_extra_files_carry_markers():
 
 
 @kit_only
+def test_release_as_is_gone_once_released():
+    # release-as pins only the first release (KIT.md, "Maintaining the kit"). Release Please moves the manifest to
+    # that version when it cuts the release; a key still set then forces every later release to the same version.
+    package = kit_config()["packages"]["."]
+    if "release-as" in package:
+        released = json.loads((ROOT / KIT_RELEASE_MANIFEST).read_text(encoding="utf-8"))["."]
+        assert parse_version(released) < parse_version(package["release-as"]), (
+            f"kit v{released} is released: remove release-as from {KIT_RELEASE_CONFIG}"
+        )
+
+
+@kit_only
 def test_changelog_starts_as_heading():
     assert (ROOT / "CHANGELOG.md").read_text(encoding="utf-8").startswith("# Changelog\n")
