@@ -17,7 +17,10 @@
         ".cursor-plugin"
       ],
       "extra-files": [
-        ".skill-hub/kit.yml"
+        {
+          "type": "generic",
+          "path": ".skill-hub/kit.yml"
+        }
       ]
     }
   }
