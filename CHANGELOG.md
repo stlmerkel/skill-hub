@@ -76,5 +76,3 @@
 * use escape sequence for BOM in hub.yml loading ([83e7c68](https://github.com/stlmerkel/skill-hub/commit/83e7c686bf584c94accecf4361886bfc911a359a))
 * warn when a first release would overwrite a skill's version ([53bec88](https://github.com/stlmerkel/skill-hub/commit/53bec88b60dccb59ab133f3e3c0ca3ccb34a8403))
 * widen secret patterns to catch prefixed tokens and symbol passwords ([212396c](https://github.com/stlmerkel/skill-hub/commit/212396c6da4490d692e47ecdcdc8c30052c60350))
-
-## Changelog
