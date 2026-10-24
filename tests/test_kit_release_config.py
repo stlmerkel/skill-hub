@@ -50,7 +50,8 @@ def test_kit_package_shape():
     # release-as pins only the first release (KIT.md, "Maintaining the kit"); its value is not asserted.
     if "release-as" in package:
         assert parse_version(package["release-as"]) is not None
-    assert package["extra-files"] == [".skill-hub/kit.yml"]
+    # A bare .yml path makes Release Please parse and re-dump the file, dropping its comments and marker.
+    assert package["extra-files"] == [{"type": "generic", "path": ".skill-hub/kit.yml"}]
 
 
 def test_kit_exclude_paths_match_contract():
