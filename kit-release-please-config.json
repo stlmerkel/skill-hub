@@ -10,7 +10,6 @@
     ".": {
       "component": "kit",
       "changelog-path": "CHANGELOG.md",
-      "release-as": "1.0.0",
       "exclude-paths": [
         "skills",
         ".claude-plugin",
