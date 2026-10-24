@@ -1,7 +1,7 @@
 # Records which skill-hub kit release this hub was last updated to.
 # `skill-hub update` rewrites it; edit it by hand only to point at a different kit.
 repo: "https://github.com/stlmerkel/skill-hub"
-version: "0.0.0" # x-release-please-version
+version: "1.0.0" # x-release-please-version
 commit: ""
 workflows_version: ""
 workflows_commit: ""
